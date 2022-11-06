@@ -45,8 +45,8 @@ def d2(f, h, stencils, periodic=False):
     else:
         return (np.sum(rolling * coefficients, axis=0) / h**2.)[stencils//2:-stencils//2]
 def f(x):
-    return np.exp(x)
+    return np.sin(x)
 
-x, h= grid(-1., 1., 1.e-3)
+x, h = grid(-np.pi, np.pi, 1.e-3)
 s = 9
-print(d2(f(x), h, s) - f(x)[s//2:-s//2])
+print(d1(np.sin(x)**2., h, s, True) - 2*np.cos(x)*np.sin(x))
