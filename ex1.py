@@ -82,39 +82,53 @@ s = 5
 def psi(x):
     sigma0 = 1
     x0 = 0.
-    p = 1.
+    p = 10.
     return (sigma0*(2.*np.pi)**0.5)**(-0.5) * np.exp(-((x-x0)**2. / (4. * sigma0**2.)) + 1.j*p*x)
     # return np.exp(-x**2.)
+
+
 def V(x):
     return 0.
 
 
 def H(f, x, h):
     # laplace = der(np.real(f), h, 5, periodic=True, order=2) + 1.j * der(np.imag(f), h, 5, periodic=True, order=2)
-    return -0.5 * der(f, h, 9, periodic=True, order=2) + f*V(x)
+    return -0.5 * der(f, h, 5, periodic=False, order=2) + f*V(x)
 
 
 def f(y, x, t, h):
     return -1.j * H(y, x, h)
 
+def energy(y, x, h):
+    return h*np.sum(np.conj(y) * H(y, x, h), axis=1)
+
+
 def runge_kutta(psi_0, x, h, dt):
     t0 = 0.
-    k1 = dt*f(psi_0, x, t0, h)
+    hamiltionian_eval0 = H(y, x, h)
+    k1 = -1.j * hamiltionian_eval0*dt
     k2 = dt*f(psi_0 + k1/2, x, t0 + dt/2., h)
     k3 = dt*f(psi_0 + k2/2, x, t0 + dt/2., h)
     k4 = dt*f(psi_0 + k3, x, t0 + dt, h)
-    return psi_0 + (k1+2.*k2+2.*k3+k4)/6
+    return psi_0 + (k1+2.*k2+2.*k3+k4)/6, hamiltionian_eval0
 
-x, h = grid(-2, 2., 0.005)
+
+x, h = grid(-5, 5, 1.e-2)
 y = psi(x)
+# y = np.sin(x)
 # plt.plot(x, y)
 # plt.plot(x, der(y, h, 5, order=2))
 # plt.show()
 # print(der(y, h, 5, order=1))
-
-for i in range(100):
-    # plt.plot(der(y, h, 5, periodic=True, order=2))
+y_list = [[h*np.conj(y)*H(y, x, h)]]
+normalization_list = [[h*np.conj(y)*y]]
+for i in range(10):
+    y, hh = runge_kutta(y, x, h, dt=0.01)
+    # plt.plot(x, np.imag(y))
     # plt.show()
-    y = runge_kutta(y, x, h, dt=0.001)
-    plt.plot(x, np.real(y))
-    plt.show()
+    y_list.append([h*np.conj(y)*hh])
+    normalization_list.append([h*np.conj(y)*y])
+energies = np.sum(np.concatenate(y_list, axis=0), axis=1)
+normalization = np.sum(np.concatenate(normalization_list, axis=0), axis=1)
+print(energies)
+print(normalization)
