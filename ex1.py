@@ -79,7 +79,7 @@ def der(f, h, stencils, periodic=False, order=1):
 def psi(x):
     sigma0 = 1
     x0 = 0.
-    p = 100
+    p = 10.
     return (sigma0*(2.*np.pi)**0.5)**(-0.5) * np.exp(-((x-x0)**2. / (4. * sigma0**2.)) + 1.j*p*x)
     # return np.exp(-x**2.)
 
@@ -111,6 +111,16 @@ def runge_kutta(psi_0, x, h, dt):
     return psi_0 + (k1+2.*k2+2.*k3+k4)/6
 
 
+#plot1
+x, h = grid(-0.5, 0.5, 1e-4)
+f = np.exp(x)
+name = []
+for i in [1]:
+    for j in [5, 7, 9]:
+        plt.semilogy(x, abs((der(f, h, j, order=i)-f)/f))
+        name.append("Order="+str(i)+" stencils="+str(j))
+plt.legend(name)
+plt.show()
 # x, h = grid(-10, 10, 5e-2)
 # y = psi(x)
 # # y = np.sin(x)
@@ -126,10 +136,12 @@ def runge_kutta(psi_0, x, h, dt):
 # fig = plt.figure()
 # ax = fig.add_subplot(111)
 # line1, = ax.plot(x, np.real(y))
-# for i in range(10000):
+# steps = 10000
+# dt = 0.001
+# for i in range(steps):
 #     try:
-#         y = runge_kutta(y, x, h, dt=0.001)
-#         # y = y * np.logical_not(np.abs(np.arange(num)-num/2)>(1-p)*num/2).astype(int)
+#         y = runge_kutta(y, x, h, dt=dt)
+#         y = y * np.logical_not(np.abs(np.arange(num)-num/2)>(1-p)*num/2).astype(int)
 #         line1.set_ydata(np.real(y))
 #         fig.canvas.draw()
 #         fig.canvas.flush_events()
@@ -138,7 +150,14 @@ def runge_kutta(psi_0, x, h, dt):
 #     except KeyboardInterrupt:
 #         pass
 #
-# energies = np.sum(np.concatenate(y_list, axis=0), axis=1)
-# normalization = np.sum(np.concatenate(normalization_list, axis=0), axis=1)
-# print(energies)
-# print(normalization)
+# energies = np.real(np.sum(np.concatenate(y_list, axis=0), axis=1))
+# normalization = np.real(np.sum(np.concatenate(normalization_list, axis=0), axis=1))
+#
+# energy_error = (energies[0]-energies) / energies[0]
+# normalization_error = (1.-normalization) / normalization[0]
+# # print(energies)
+# # print(normalization)
+# # print(energies)
+# # plt.plot(np.arange(steps+1)*dt, normalization_error)
+# # plt.plot(np.arange(steps+1)*dt, energy_error)
+# # plt.show()
