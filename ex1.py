@@ -78,19 +78,20 @@ def der(f, h, stencils, periodic=False, order=1):
 
 def psi(x):
     sigma0 = 1
-    x0 = 5.
-    p = 10.
+    x0 = 0.
+    p = 100
     return (sigma0*(2.*np.pi)**0.5)**(-0.5) * np.exp(-((x-x0)**2. / (4. * sigma0**2.)) + 1.j*p*x)
     # return np.exp(-x**2.)
 
 
-def V(x):
-    return 0.
+def barrier(x, x0, x1):
+    return np.heaviside(x-x0, 1) - np.heaviside(x-x1, 1)
 
 
 def H(f, x, h):
     # laplace = der(np.real(f), h, 5, periodic=True, order=2) + 1.j * der(np.imag(f), h, 5, periodic=True, order=2)
-    return -0.5 * der(f, h, 7, periodic=True, order=2) + f*V(x)
+    v = 1000*(barrier(x, 9, 10) + barrier(x, -10, -9))
+    return -0.5 * der(f, h, 9, periodic=True, order=2) + f*v
 
 
 def f_dde(y, x, t, h):
@@ -110,34 +111,34 @@ def runge_kutta(psi_0, x, h, dt):
     return psi_0 + (k1+2.*k2+2.*k3+k4)/6
 
 
-x, h = grid(-10, 10, 4e-2)
-y = psi(x)
-# y = np.sin(x)
-# plt.plot(x, y)
-# plt.plot(x, der(y, h, 5, order=2))
-# plt.show()
-# print(der(y, h, 5, order=1))
-y_list = [[h*np.conj(y)*H(y, x, h)]]
-normalization_list = [[h*np.conj(y)*y]]
-num = len(y)
-p = 0.1
-plt.ion()
-fig = plt.figure()
-ax = fig.add_subplot(111)
-line1, = ax.plot(x, np.imag(y))
-for i in range(1000):
-    try:
-        y = runge_kutta(y, x, h, dt=0.001)
-        # y = y * np.logical_not(np.abs(np.arange(num)-num/2)>(1-p)*num/2).astype(int)
-        line1.set_ydata(np.imag(y))
-        fig.canvas.draw()
-        fig.canvas.flush_events()
-        y_list.append([h*np.conj(y)*H(y, x, h)])
-        normalization_list.append([h*np.conj(y)*y])
-    except KeyboardInterrupt:
-        pass
-
-energies = np.sum(np.concatenate(y_list, axis=0), axis=1)
-normalization = np.sum(np.concatenate(normalization_list, axis=0), axis=1)
-print(energies)
-print(normalization)
+# x, h = grid(-10, 10, 5e-2)
+# y = psi(x)
+# # y = np.sin(x)
+# # plt.plot(x, y)
+# # plt.plot(x, der(y, h, 5, order=2))
+# # plt.show()
+# # print(der(y, h, 5, order=1))
+# y_list = [[h*np.conj(y)*H(y, x, h)]]
+# normalization_list = [[h*np.conj(y)*y]]
+# num = len(y)
+# p = 0.1
+# plt.ion()
+# fig = plt.figure()
+# ax = fig.add_subplot(111)
+# line1, = ax.plot(x, np.real(y))
+# for i in range(10000):
+#     try:
+#         y = runge_kutta(y, x, h, dt=0.001)
+#         # y = y * np.logical_not(np.abs(np.arange(num)-num/2)>(1-p)*num/2).astype(int)
+#         line1.set_ydata(np.real(y))
+#         fig.canvas.draw()
+#         fig.canvas.flush_events()
+#         y_list.append([h*np.conj(y)*H(y, x, h)])
+#         normalization_list.append([h*np.conj(y)*y])
+#     except KeyboardInterrupt:
+#         pass
+#
+# energies = np.sum(np.concatenate(y_list, axis=0), axis=1)
+# normalization = np.sum(np.concatenate(normalization_list, axis=0), axis=1)
+# print(energies)
+# print(normalization)
