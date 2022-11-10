@@ -127,7 +127,7 @@ def test(ff, dd1, dd2, h_list, s):
         d2_list.append(np.mean(err_d2[s//2:-s//2+1]))
     return d1_list, d2_list
 
-h_list = [1.e-1, 5.e-2, 1.e-2, 1.e-3, 1.e-4, 1.e-5, 1.e-6]
+h_list = np.logspace(-6, -1)
 leg = []
 for i in [5, 7, 9]:
     leg.append("stencils="+str(i))
