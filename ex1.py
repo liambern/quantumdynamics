@@ -115,7 +115,7 @@ def runge_kutta(psi_0, x, h, dt):
 def test(ff, dd1, dd2, h_list, s):
     d1_list = []
     d2_list = []
-    eps = 1.e-10
+    eps = 0.
     for j in h_list:
         x, h = grid(-1, 1, j)
         f = ff(x)
