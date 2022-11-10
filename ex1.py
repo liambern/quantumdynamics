@@ -112,16 +112,41 @@ def runge_kutta(psi_0, x, h, dt):
 
 
 #plot1
-x, h = grid(-0.5, 0.5, 1e-4)
-f = np.exp(x)
-name = []
-for i in [1]:
-    for j in [5, 7, 9]:
-        plt.semilogy(x, abs((der(f, h, j, order=i)-f)/f))
-        name.append("Order="+str(i)+" stencils="+str(j))
-plt.legend(name)
+def test(ff, dd1, dd2, h_list, s):
+    d1_list = []
+    d2_list = []
+    eps = 1.e-10
+    for j in h_list:
+        x, h = grid(-1, 1, j)
+        f = ff(x)
+        d1 = dd1(x)
+        d2 = dd2(x)
+        err_d1 = abs((der(f, h, s, order=1)-d1)/(d1+eps))*100
+        err_d2 = abs((der(f, h, s, order=2)-d2)/(d2+eps))*100
+        d1_list.append(np.mean(err_d1[s//2:-s//2+1]))
+        d2_list.append(np.mean(err_d2[s//2:-s//2+1]))
+    return d1_list, d2_list
+
+h_list = [1.e-1, 5.e-2, 1.e-2, 1.e-3, 1.e-4, 1.e-5, 1.e-6]
+leg = []
+for i in [5, 7, 9]:
+    leg.append("stencils="+str(i))
+f = np.sin
+fig, axs = plt.subplots(2)
+def ddddd2(x):
+    return -np.sin(x)
+for i in [5,7,9]:
+    d1i, d2i = test(np.exp, np.exp, np.exp, h_list, i)
+    axs[0].loglog(h_list, d1i)
+    axs[1].loglog(h_list, d2i)
+axs[0].set_ylabel("f' mean relative error [%]")
+axs[1].set_ylabel("f'' mean relative error [%]")
+axs[0].legend(leg, loc='upper right')
+# axs[1].legend(leg, loc='upper right')
+fig.suptitle("f(x)=e^x")
+plt.xlabel("dx")
 plt.show()
-# x, h = grid(-10, 10, 5e-2)
+
 # y = psi(x)
 # # y = np.sin(x)
 # # plt.plot(x, y)
