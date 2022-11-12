@@ -76,10 +76,9 @@ def der(f, h, stencils, periodic=False, order=1):
 
 #2.
 
-def psi(x):
-    sigma0 = 1
+def psi(x, p):
+    sigma0 = 0.5
     x0 = 0.
-    p = 10.
     return (sigma0*(2.*np.pi)**0.5)**(-0.5) * np.exp(-((x-x0)**2. / (4. * sigma0**2.)) + 1.j*p*x)
     # return np.exp(-x**2.)
 
@@ -147,48 +146,136 @@ def test(ff, dd1, dd2, h_list, s):
 # plt.savefig("img.pdf")
 
 
+
+
+
+x, h = grid(-5, 5, 5e-2)
 def H(f, x, h):
     # laplace = der(np.real(f), h, 5, periodic=True, order=2) + 1.j * der(np.imag(f), h, 5, periodic=True, order=2)
-    v = 1000*(barrier(x, 9, 10) + barrier(x, -10, -9))
+    v = 1000*(barrier(x, 4, 5) + barrier(x, -5, -4))
     return -0.5 * der(f, h, 9, periodic=True, order=2) + f*v
-
-
-x, h = grid(-10, 10, 5e-2)
-y = psi(x)
+y = psi(x, 0)
 # y = np.sin(x)
 # plt.plot(x, y)
 # plt.plot(x, der(y, h, 5, order=2))
 # plt.show()
 # print(der(y, h, 5, order=1))
-y_list = [[h*np.conj(y)*H(y, x, h)]]
-normalization_list = [[h*np.conj(y)*y]]
+y_list_1 = [[h*np.conj(y)*H(y, x, h)]]
+normalization_list_1 = [[h*np.conj(y)*y]]
 num = len(y)
 p = 0.1
 plt.ion()
 fig = plt.figure()
 ax = fig.add_subplot(111)
-line1, = ax.plot(x, np.real(y))
-steps = 1000
+# ax.set_ylabel("f' mean relative error [%]")
+# ax.set_xlabel("x")
+line1, = ax.plot(x, np.abs(y), label='|Ψ(x)|')
+line2, = ax.plot(x, np.real(y), label='Re(Ψ(x))')
+line3, = ax.plot(x, np.imag(y), label='Imag(Ψ(x))')
+ax.legend()
+steps = 10000
 dt = 0.001
+# fig, axs = plt.subplots(2)
+
 for i in range(steps):
     try:
         y = runge_kutta(y, x, h, dt=dt)
-        y = y * np.logical_not(np.abs(np.arange(num)-num/2)>(1-p)*num/2).astype(int)
-        line1.set_ydata(np.real(y))
+        line1.set_ydata(np.abs(y))
+        line2.set_ydata(np.real(y))
+        line3.set_ydata(np.imag(y))
         fig.canvas.draw()
         fig.canvas.flush_events()
-        y_list.append([h*np.conj(y)*H(y, x, h)])
-        normalization_list.append([h*np.conj(y)*y])
+        y_list_1.append([h*np.conj(y)*H(y, x, h)])
+        normalization_list_1.append([h*np.conj(y)*y])
     except KeyboardInterrupt:
         pass
 
-energies = np.real(np.sum(np.concatenate(y_list, axis=0), axis=1))
-normalization = np.real(np.sum(np.concatenate(normalization_list, axis=0), axis=1))
-
-energy_error = (energies[0]-energies) / energies[0]
-normalization_error = (1.-normalization) / normalization[0]
-print(energies)
-print(normalization)
-plt.plot(np.arange(steps+1)*dt, normalization_error)
-plt.plot(np.arange(steps+1)*dt, energy_error)
-plt.show()
+# energies_1 = np.real(np.sum(np.concatenate(y_list_1, axis=0), axis=1))
+# normalization_1 = np.real(np.sum(np.concatenate(normalization_list_1, axis=0), axis=1))
+#
+# energy_error_1 = (energies_1[0]-energies_1) / energies_1[0]
+# normalization_error_1 = (1.-normalization_1) / normalization_1[0]
+#
+#
+# ##
+# def H(f, x, h):
+#     v = 1000*(barrier(x, 4, 5) + barrier(x, -5, -4))
+#     return -0.5 * der(f, h, 9, periodic=True, order=2) + f*v*0
+# y = psi(x, 0)
+# y_list_2 = [[h*np.conj(y)*H(y, x, h)]]
+# normalization_list_2 = [[h*np.conj(y)*y]]
+# num = len(y)
+# for i in range(steps):
+#     try:
+#         y = runge_kutta(y, x, h, dt=dt)
+#         y_list_2.append([h*np.conj(y)*H(y, x, h)])
+#         normalization_list_2.append([h*np.conj(y)*y])
+#     except KeyboardInterrupt:
+#         pass
+#
+# energies_2 = np.real(np.sum(np.concatenate(y_list_2, axis=0), axis=1))
+# normalization_2 = np.real(np.sum(np.concatenate(normalization_list_2, axis=0), axis=1))
+#
+# energy_error_2 = (energies_2[0]-energies_2) / energies_2[0]
+# normalization_error_2 = (1.-normalization_2) / normalization_2[0]
+# ##
+# def H(f, x, h):
+#     v = 1000*(barrier(x, 4, 5) + barrier(x, -5, -4))
+#     return -0.5 * der(f, h, 9, periodic=True, order=2) + f*v
+# y = psi(x, 10)
+# y_list_3 = [[h*np.conj(y)*H(y, x, h)]]
+# normalization_list_3 = [[h*np.conj(y)*y]]
+# num = len(y)
+# for i in range(steps):
+#     try:
+#         y = runge_kutta(y, x, h, dt=dt)
+#         y_list_3.append([h*np.conj(y)*H(y, x, h)])
+#         normalization_list_3.append([h*np.conj(y)*y])
+#     except KeyboardInterrupt:
+#         pass
+#
+# energies_3 = np.real(np.sum(np.concatenate(y_list_3, axis=0), axis=1))
+# normalization_3 = np.real(np.sum(np.concatenate(normalization_list_3, axis=0), axis=1))
+#
+# energy_error_3 = (energies_3[0]-energies_3) / energies_3[0]
+# normalization_error_3 = (1.-normalization_3) / normalization_3[0]
+# ##
+# def H(f, x, h):
+#     v = 1000*(barrier(x, 4, 5) + barrier(x, -5, -4))
+#     return -0.5 * der(f, h, 9, periodic=True, order=2) + f*v*0
+# y = psi(x, 10)
+# y_list_4 = [[h*np.conj(y)*H(y, x, h)]]
+# normalization_list_4 = [[h*np.conj(y)*y]]
+# num = len(y)
+# for i in range(steps):
+#     try:
+#         y = runge_kutta(y, x, h, dt=dt)
+#         y_list_4.append([h*np.conj(y)*H(y, x, h)])
+#         normalization_list_4.append([h*np.conj(y)*y])
+#     except KeyboardInterrupt:
+#         pass
+#
+# energies_4 = np.real(np.sum(np.concatenate(y_list_4, axis=0), axis=1))
+# normalization_4 = np.real(np.sum(np.concatenate(normalization_list_4, axis=0), axis=1))
+#
+# energy_error_4 = (energies_4[0]-energies_4) / energies_4[0]
+# normalization_error_4 = (1.-normalization_4) / normalization_4[0]
+#
+# ##
+# axs[0].semilogy(np.arange(steps+1), energy_error_1, label='p=0, Rigid boundary')
+# axs[0].semilogy(np.arange(steps+1), energy_error_2, label='p=0, Periodic boundary')
+# axs[0].semilogy(np.arange(steps+1), energy_error_3, label='p=10, Rigid boundary')
+# axs[0].semilogy(np.arange(steps+1), energy_error_4, label='p=10, Periodic boundary')
+# axs[0].set_ylabel("Energy")
+# axs[1].semilogy(np.arange(steps+1), normalization_error_1, label='p=0, Rigid boundary')
+# axs[1].semilogy(np.arange(steps+1), normalization_error_2, label='p=0, Periodic boundary')
+# axs[1].semilogy(np.arange(steps+1), normalization_error_3, label='p=10, Rigid boundary')
+# axs[1].semilogy(np.arange(steps+1), normalization_error_4, label='p=10, Periodic boundary')
+# axs[1].set_ylabel("Normalization")
+#
+# # plt.plot(np.arange(steps+1)*dt, energy_error, label='|Ψ(x)|')
+# axs[1].legend()
+# fig.suptitle("Relative errors [%], dt=0.001")
+# plt.xlabel("Time steps [dt]")
+# plt.ylabel("Relative error [%]")
+# plt.savefig("1_dt=0.001.pdf")
