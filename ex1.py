@@ -88,10 +88,6 @@ def barrier(x, x0, x1):
     return np.heaviside(x-x0, 1) - np.heaviside(x-x1, 1)
 
 
-def H(f, x, h):
-    # laplace = der(np.real(f), h, 5, periodic=True, order=2) + 1.j * der(np.imag(f), h, 5, periodic=True, order=2)
-    v = 1000*(barrier(x, 9, 10) + barrier(x, -10, -9))
-    return -0.5 * der(f, h, 9, periodic=True, order=2) + f*v
 
 
 def f_dde(y, x, t, h):
@@ -115,74 +111,84 @@ def runge_kutta(psi_0, x, h, dt):
 def test(ff, dd1, dd2, h_list, s):
     d1_list = []
     d2_list = []
-    eps = 0.
+    eps = 1.e-6
     for j in h_list:
         x, h = grid(-1, 1, j)
-        f = ff(x)
-        d1 = dd1(x)
-        d2 = dd2(x)
-        err_d1 = abs((der(f, h, s, order=1)-d1)/(d1+eps))*100
-        err_d2 = abs((der(f, h, s, order=2)-d2)/(d2+eps))*100
+        f = np.imag(ff(x))
+        d1 = np.imag(dd1(x))
+        d2 = np.imag(dd2(x))
+        err_d1 = abs((der(f, h, s, order=1)-d1)/(abs(d1)+eps))*100
+        err_d2 = abs((der(f, h, s, order=2)-d2)/(abs(d2)+eps))*100
         d1_list.append(np.mean(err_d1[s//2:-s//2+1]))
         d2_list.append(np.mean(err_d2[s//2:-s//2+1]))
     return d1_list, d2_list
 
-h_list = np.logspace(-6, -1)
-leg = []
-for i in [5, 7, 9]:
-    leg.append("stencils="+str(i))
-f = np.sin
-fig, axs = plt.subplots(2)
-def ddddd2(x):
-    return -np.sin(x)
-for i in [5,7,9]:
-    d1i, d2i = test(np.exp, np.exp, np.exp, h_list, i)
-    axs[0].loglog(h_list, d1i)
-    axs[1].loglog(h_list, d2i)
-axs[0].set_ylabel("f' mean relative error [%]")
-axs[1].set_ylabel("f'' mean relative error [%]")
-axs[0].legend(leg, loc='upper right')
-# axs[1].legend(leg, loc='upper right')
-fig.suptitle("f(x)=e^x")
-plt.xlabel("dx")
-plt.show()
+# h_list = np.logspace(-6, -1)
+# leg = []
+# for i in [5, 7, 9]:
+#     leg.append("stencils="+str(i))
+# fig, axs = plt.subplots(2)
+# def f(x):
+#     return np.exp(1.j*x)
+# def f1(x):
+#     return -np.sin(x)+1.j*np.cos(x)
+# def f2(x):
+#     return -np.cos(x)-1.j*np.sin(x)
+# for i in [5,7,9]:
+#     d1i, d2i = test(f, f1, f2, h_list, i)
+#     axs[0].loglog(h_list, d1i)
+#     axs[1].loglog(h_list, d2i)
+# axs[0].set_ylabel("f' mean relative error [%]")
+# axs[1].set_ylabel("f'' mean relative error [%]")
+# axs[0].legend(leg, loc='upper right')
+# # axs[1].legend(leg, loc='upper right')
+# fig.suptitle("f(x)=exp(ix): imaginary part")
+# plt.xlabel("dx")
+# plt.savefig("img.pdf")
 
-# y = psi(x)
-# # y = np.sin(x)
-# # plt.plot(x, y)
-# # plt.plot(x, der(y, h, 5, order=2))
-# # plt.show()
-# # print(der(y, h, 5, order=1))
-# y_list = [[h*np.conj(y)*H(y, x, h)]]
-# normalization_list = [[h*np.conj(y)*y]]
-# num = len(y)
-# p = 0.1
-# plt.ion()
-# fig = plt.figure()
-# ax = fig.add_subplot(111)
-# line1, = ax.plot(x, np.real(y))
-# steps = 10000
-# dt = 0.001
-# for i in range(steps):
-#     try:
-#         y = runge_kutta(y, x, h, dt=dt)
-#         y = y * np.logical_not(np.abs(np.arange(num)-num/2)>(1-p)*num/2).astype(int)
-#         line1.set_ydata(np.real(y))
-#         fig.canvas.draw()
-#         fig.canvas.flush_events()
-#         y_list.append([h*np.conj(y)*H(y, x, h)])
-#         normalization_list.append([h*np.conj(y)*y])
-#     except KeyboardInterrupt:
-#         pass
-#
-# energies = np.real(np.sum(np.concatenate(y_list, axis=0), axis=1))
-# normalization = np.real(np.sum(np.concatenate(normalization_list, axis=0), axis=1))
-#
-# energy_error = (energies[0]-energies) / energies[0]
-# normalization_error = (1.-normalization) / normalization[0]
-# # print(energies)
-# # print(normalization)
-# # print(energies)
-# # plt.plot(np.arange(steps+1)*dt, normalization_error)
-# # plt.plot(np.arange(steps+1)*dt, energy_error)
-# # plt.show()
+
+def H(f, x, h):
+    # laplace = der(np.real(f), h, 5, periodic=True, order=2) + 1.j * der(np.imag(f), h, 5, periodic=True, order=2)
+    v = 1000*(barrier(x, 9, 10) + barrier(x, -10, -9))
+    return -0.5 * der(f, h, 9, periodic=True, order=2) + f*v
+
+
+x, h = grid(-10, 10, 5e-2)
+y = psi(x)
+# y = np.sin(x)
+# plt.plot(x, y)
+# plt.plot(x, der(y, h, 5, order=2))
+# plt.show()
+# print(der(y, h, 5, order=1))
+y_list = [[h*np.conj(y)*H(y, x, h)]]
+normalization_list = [[h*np.conj(y)*y]]
+num = len(y)
+p = 0.1
+plt.ion()
+fig = plt.figure()
+ax = fig.add_subplot(111)
+line1, = ax.plot(x, np.real(y))
+steps = 1000
+dt = 0.001
+for i in range(steps):
+    try:
+        y = runge_kutta(y, x, h, dt=dt)
+        y = y * np.logical_not(np.abs(np.arange(num)-num/2)>(1-p)*num/2).astype(int)
+        line1.set_ydata(np.real(y))
+        fig.canvas.draw()
+        fig.canvas.flush_events()
+        y_list.append([h*np.conj(y)*H(y, x, h)])
+        normalization_list.append([h*np.conj(y)*y])
+    except KeyboardInterrupt:
+        pass
+
+energies = np.real(np.sum(np.concatenate(y_list, axis=0), axis=1))
+normalization = np.real(np.sum(np.concatenate(normalization_list, axis=0), axis=1))
+
+energy_error = (energies[0]-energies) / energies[0]
+normalization_error = (1.-normalization) / normalization[0]
+print(energies)
+print(normalization)
+plt.plot(np.arange(steps+1)*dt, normalization_error)
+plt.plot(np.arange(steps+1)*dt, energy_error)
+plt.show()
