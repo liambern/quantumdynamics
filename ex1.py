@@ -1,9 +1,7 @@
 import numpy as np
 from matplotlib.animation import FuncAnimation, PillowWriter
 from matplotlib import pyplot as plt
-
-
-# 1.
+import matplotlib.patches as patches
 
 
 def grid(x_min, x_max, h_approx):
@@ -78,11 +76,9 @@ def der(f, h, stencils, periodic=False, order=1):
 
 # 2.
 
-def psi(x, p):
+def psi(x, p, x0):
     sigma0 = 0.5
-    x0 = 0.
     return (sigma0 * (2. * np.pi) ** 0.5) ** (-0.5) * np.exp(-((x - x0) ** 2. / (4. * sigma0 ** 2.)) + 1.j * p * x)
-    # return np.exp(-x**2.)
 
 
 def barrier(x, x0, x1):
@@ -130,7 +126,7 @@ def test(ff, dd1, dd2, h_list, s):
 # plt.savefig("img.pdf")
 
 
-def run(x_min, x_max, barriers, periodic=False, p=0, dx=5e-2, dt=0.001, t_max=10, plot=False):
+def run(x_min, x_max, barriers, periodic=False, p=0, mu=0, dx=5e-2, dt=0.001, t_max=10, plot=False):
     if not periodic:
         x, h = grid(x_min - 1, x_max + 1, dx)
     else:
@@ -138,6 +134,8 @@ def run(x_min, x_max, barriers, periodic=False, p=0, dx=5e-2, dt=0.001, t_max=10
 
     def H(f, x, h):
         v = 0.
+        for params in barriers: #list of lists, in the form [v, x_min, x_max]
+            v += params[0]*barrier(x, params[1], params[2])
         if not periodic:
             v += 1000 * (barrier(x, x_max, x_max + 1) + barrier(x, x_min - 1, x_min))
         return -0.5 * der(f, h, 9, periodic=True, order=2) + f * v
@@ -153,11 +151,10 @@ def run(x_min, x_max, barriers, periodic=False, p=0, dx=5e-2, dt=0.001, t_max=10
         k4 = dt * f_dde(psi_0 + k3, x, t0 + dt, h)
         return psi_0 + (k1 + 2. * k2 + 2. * k3 + k4) / 6
 
-    y_list = [psi(x, p)]
+    y_list = [psi(x, p, mu)]
     y = y_list[0]
     energy_list = [[h * np.conj(y) * H(y, x, h)]]
     normalization_list = [[h * np.conj(y) * y]]
-    num = len(y)
     if plot:
         fig = plt.figure()
         ax = fig.add_subplot(111)
@@ -174,6 +171,10 @@ def run(x_min, x_max, barriers, periodic=False, p=0, dx=5e-2, dt=0.001, t_max=10
         ax.set_xlim([x[0], x[-1]])
         ax.grid(True, which='both', ls='--')
         ax.axhline(y=0, color='k', alpha=0.75)
+        ax.set_axisbelow(True)
+        for params in barriers:
+            rect = patches.Rectangle((params[1], 0), params[2]-params[1], params[0], edgecolor='m', ls='dashed', facecolor='none')
+            ax.add_patch(rect)
         ax.set_xlabel("X")
         line1, = ax.plot(x, np.abs(y), label='|Ψ(x)|')
         line2, = ax.plot(x, np.real(y), label='Re(Ψ(x))')
@@ -193,7 +194,7 @@ def run(x_min, x_max, barriers, periodic=False, p=0, dx=5e-2, dt=0.001, t_max=10
             line3.set_ydata(np.imag(y))
             return line1, line2, line3
         ani = FuncAnimation(fig, animate, frames=int((t_max / dt) / frame_skip), blit=True)
-        ani.save("max={max},min={min},p={p},periodic={periodic}.gif".format(max=str(x_max), min=str(x_min), p=str(p),
+        ani.save("max={max},min={min},p={p},periodic={periodic}.gif".format(max=str(x_max), min=str(x_min), p=str(p)[:5],
                 periodic=str(periodic)), dpi=250, writer=PillowWriter(fps=50))
     else:
         for k in range(int(t_max / dt)):
@@ -208,7 +209,46 @@ def run(x_min, x_max, barriers, periodic=False, p=0, dx=5e-2, dt=0.001, t_max=10
     return energy_error, normalization_error
 
 
-run(-5, 5, 0, periodic=True, p=0, dx=5e-2, dt=0.001, t_max=10, plot=True)
-run(-5, 5, 0, periodic=True, p=5, dx=5e-2, dt=0.001, t_max=10, plot=True)
-run(-5, 5, 0, periodic=False, p=0, dx=5e-2, dt=0.001, t_max=10, plot=True)
-run(-5, 5, 0, periodic=False, p=5, dx=5e-2, dt=0.001, t_max=10, plot=True)
+# energy_error_1, normalization_error_1 = run(-5, 5, 0, periodic=True, p=0, dx=5e-2, dt=0.0001, t_max=1, plot=False)
+# energy_error_2, normalization_error_2 = run(-5, 5, 0, periodic=True, p=5, dx=5e-2, dt=0.0001, t_max=1, plot=False)
+# energy_error_3, normalization_error_3 = run(-5, 5, 0, periodic=False, p=0, dx=5e-2, dt=0.0001, t_max=1, plot=False)
+# energy_error_4, normalization_error_4 = run(-5, 5, 0, periodic=False, p=5, dx=5e-2, dt=0.0001, t_max=1, plot=False)
+v0 = 10
+p = (2*v0)**0.5
+p1 = 0.1*p
+p2 = 0.9*p
+p3 = 1.1*p
+p4 = 2*p
+
+x_min = 0
+x_max = 100
+dt = 0.001
+t = 0.5
+dx = 5e-2
+plot = True
+periodic = False
+energy_error_1, normalization_error_1 = run(x_min, x_max, barriers=[[v0, (x_max-x_min)/2-5, (x_max-x_min)/2+5]], periodic=periodic, p=p1, mu=(x_max-x_min)/2-10, dx=5e-2, dt=dt, t_max=t, plot=plot)
+energy_error_2, normalization_error_2 = run(x_min, x_max, barriers=[[v0, (x_max-x_min)/2-5, (x_max-x_min)/2+5]], periodic=periodic, p=p2, mu=(x_max-x_min)/2-10, dx=5e-2, dt=dt, t_max=t, plot=plot)
+energy_error_3, normalization_error_3 = run(x_min, x_max, barriers=[[v0, (x_max-x_min)/2-5, (x_max-x_min)/2+5]], periodic=periodic, p=p3, mu=(x_max-x_min)/2-10, dx=5e-2, dt=dt, t_max=t, plot=plot)
+energy_error_4, normalization_error_4 = run(x_min, x_max, barriers=[[v0, (x_max-x_min)/2-5, (x_max-x_min)/2+5]], periodic=periodic, p=p4, mu=(x_max-x_min)/2-10, dx=5e-2, dt=dt, t_max=t, plot=plot)
+
+
+steps = len(energy_error_1)-1
+fig, axs = plt.subplots(2)
+axs[0].semilogy(np.arange(steps+1), energy_error_1, label='Rigid boundary, p=0.1V')
+axs[0].semilogy(np.arange(steps+1), energy_error_2, label='Rigid boundary, p=0.9V')
+axs[0].semilogy(np.arange(steps+1), energy_error_3, label='Rigid boundary, p=1.1V')
+axs[0].semilogy(np.arange(steps+1), energy_error_4, label='Rigid boundary, p=10V')
+axs[0].set_ylabel("Energy")
+axs[1].semilogy(np.arange(steps+1), normalization_error_1, label='Rigid boundary, p=0.1V')
+axs[1].semilogy(np.arange(steps+1), normalization_error_2, label='Rigid boundary, p=0.9V')
+axs[1].semilogy(np.arange(steps+1), normalization_error_3, label='Rigid boundary, p=1.1V')
+axs[1].semilogy(np.arange(steps+1), normalization_error_4, label='Rigid boundary, p=10V')
+axs[1].set_ylabel("Normalization")
+
+axs[1].legend()
+fig.suptitle("Relative errors [%], V=10")
+plt.xlabel("Time steps [dt]")
+plt.ylabel("Relative error [%]")
+plt.savefig("3.pdf")
+# plt.savefig("1_dt=0.001.pdf")
