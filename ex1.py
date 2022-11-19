@@ -1,15 +1,19 @@
 import numpy as np
+from matplotlib.animation import FuncAnimation, PillowWriter
 from matplotlib import pyplot as plt
 
 
-def grid(x_min, x_max, h_approx):  # creates a grid with an h close to the wanted h_approx
+# 1.
+
+
+def grid(x_min, x_max, h_approx):
     number = int((x_max - x_min) / h_approx)
     grid = np.linspace(x_min, x_max, num=number, endpoint=False)
     h = grid[1] - grid[0]
     return grid, h
 
 
-def der(f, h, stencils, periodic=False, order=1): # finite differences
+def der(f, h, stencils, periodic=False, order=1):
     rolling = []
     for i in range(-stencils // 2 + 1, stencils // 2 + 1):
         rolling.append([np.roll(f, -i)])
@@ -72,47 +76,29 @@ def der(f, h, stencils, periodic=False, order=1): # finite differences
         return r
 
 
-def psi(x, p, sigma0=0.5): # the wave packet
+# 2.
+
+def psi(x, p):
+    sigma0 = 0.5
     x0 = 0.
     return (sigma0 * (2. * np.pi) ** 0.5) ** (-0.5) * np.exp(-((x - x0) ** 2. / (4. * sigma0 ** 2.)) + 1.j * p * x)
     # return np.exp(-x**2.)
 
 
-def barrier(x, x0, x1): #potential barrier of height 1 between x0 and x1
+def barrier(x, x0, x1):
     return np.heaviside(x - x0, 1) - np.heaviside(x - x1, 1)
 
 
-def f_dde(y, x, t, h): # the function to propagate in time in Runge-Kutta
-    return -1.j * H(y, x, h)
-
-
-def runge_kutta(psi_0, x, h, dt): #4th order runge-kutta
-    t0 = 0.
-    k1 = dt * f_dde(psi_0, x, t0, h)
-    k2 = dt * f_dde(psi_0 + k1 / 2, x, t0 + dt / 2., h)
-    k3 = dt * f_dde(psi_0 + k2 / 2, x, t0 + dt / 2., h)
-    k4 = dt * f_dde(psi_0 + k3, x, t0 + dt, h)
-    return psi_0 + (k1 + 2. * k2 + 2. * k3 + k4) / 6
-
-
-def energy(y, x, h): #expectation value of the hamiltonian
-    return h * np.sum(np.conj(y) * H(y, x, h), axis=1)
-
-
-def test(ff, dd1, dd2, h_list, s, imag=False):
+# plot1
+def test(ff, dd1, dd2, h_list, s):
     d1_list = []
     d2_list = []
-    eps = 1.e-6 # to avoid (somewhat) numerical instabilities in the relative error
+    eps = 1.e-6
     for j in h_list:
         x, h = grid(-1, 1, j)
-        if not imag:
-            f = np.real(ff(x))
-            d1 = np.real(dd1(x))
-            d2 = np.real(dd2(x))
-        else:
-            f = np.imag(ff(x))
-            d1 = np.imag(dd1(x))
-            d2 = np.imag(dd2(x))
+        f = np.imag(ff(x))
+        d1 = np.imag(dd1(x))
+        d2 = np.imag(dd2(x))
         err_d1 = abs((der(f, h, s, order=1) - d1) / (abs(d1) + eps)) * 100
         err_d2 = abs((der(f, h, s, order=2) - d2) / (abs(d2) + eps)) * 100
         d1_list.append(np.mean(err_d1[s // 2:-s // 2 + 1]))
@@ -144,137 +130,85 @@ def test(ff, dd1, dd2, h_list, s, imag=False):
 # plt.savefig("img.pdf")
 
 
-x, h = grid(-5, 5, 5e-2)
+def run(x_min, x_max, barriers, periodic=False, p=0, dx=5e-2, dt=0.001, t_max=10, plot=False):
+    if not periodic:
+        x, h = grid(x_min - 1, x_max + 1, dx)
+    else:
+        x, h = grid(x_min, x_max, 5e-2)
+
+    def H(f, x, h):
+        v = 0.
+        if not periodic:
+            v += 1000 * (barrier(x, x_max, x_max + 1) + barrier(x, x_min - 1, x_min))
+        return -0.5 * der(f, h, 9, periodic=True, order=2) + f * v
+
+    def f_dde(y, x, t, h):
+        return -1.j * H(y, x, h)
+
+    def runge_kutta(psi_0, x, h, dt):
+        t0 = 0.
+        k1 = dt * f_dde(psi_0, x, t0, h)
+        k2 = dt * f_dde(psi_0 + k1 / 2, x, t0 + dt / 2., h)
+        k3 = dt * f_dde(psi_0 + k2 / 2, x, t0 + dt / 2., h)
+        k4 = dt * f_dde(psi_0 + k3, x, t0 + dt, h)
+        return psi_0 + (k1 + 2. * k2 + 2. * k3 + k4) / 6
+
+    y_list = [psi(x, p)]
+    y = y_list[0]
+    energy_list = [[h * np.conj(y) * H(y, x, h)]]
+    normalization_list = [[h * np.conj(y) * y]]
+    num = len(y)
+    if plot:
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        title = ''
+        if periodic:
+            title += 'Periodic boundary, '
+        else:
+            ax.axvline(x_min, c='r', ls='--')
+            ax.axvline(x_max, c='r', ls='--')
+            title += 'Rigid boundary, '
+        title += 'p={p}, duration={t_run} (all variables in atomic units)'.format(p=str(p), t_run=str(t_max))
+        fig.suptitle(title)
+        ax.set_ylim([-1, 1])
+        ax.set_xlim([x[0], x[-1]])
+        ax.grid(True, which='both', ls='--')
+        ax.axhline(y=0, color='k', alpha=0.75)
+        ax.set_xlabel("X")
+        line1, = ax.plot(x, np.abs(y), label='|Ψ(x)|')
+        line2, = ax.plot(x, np.real(y), label='Re(Ψ(x))')
+        line3, = ax.plot(x, np.imag(y), label='Imag(Ψ(x))')
+        ax.legend()
+
+        frame_skip = 4  # frame spacings to not plot, for memory reasons
+
+        def animate(i):
+            for k in range(frame_skip):
+                y = runge_kutta(y_list[0], x, h, dt=dt)
+                y_list[0] = y
+                energy_list.append([h * np.conj(y) * H(y, x, h)])
+                normalization_list.append([h * np.conj(y) * y])
+            line1.set_ydata(np.abs(y))
+            line2.set_ydata(np.real(y))
+            line3.set_ydata(np.imag(y))
+            return line1, line2, line3
+        ani = FuncAnimation(fig, animate, frames=int((t_max / dt) / frame_skip), blit=True)
+        ani.save("max={max},min={min},p={p},periodic={periodic}.gif".format(max=str(x_max), min=str(x_min), p=str(p),
+                periodic=str(periodic)), dpi=250, writer=PillowWriter(fps=50))
+    else:
+        for k in range(int(t_max / dt)):
+            y = runge_kutta(y_list[0], x, h, dt=dt)
+            y_list[0] = y
+            energy_list.append([h * np.conj(y) * H(y, x, h)])
+            normalization_list.append([h * np.conj(y) * y])
+    energies = np.real(np.sum(np.concatenate(energy_list, axis=0), axis=1))
+    normalization = np.real(np.sum(np.concatenate(normalization_list, axis=0), axis=1))
+    energy_error = 100. * np.abs((energies[0] - energies) / energies[0])
+    normalization_error = 100. * np.abs((1. - normalization))
+    return energy_error, normalization_error
 
 
-def H(f, x, h):
-    # laplace = der(np.real(f), h, 5, periodic=True, order=2) + 1.j * der(np.imag(f), h, 5, periodic=True, order=2)
-    v = 1000 * (barrier(x, 4, 5) + barrier(x, -5, -4))
-    return -0.5 * der(f, h, 9, periodic=True, order=2) + f * v
-
-
-y = psi(x, 0)
-# y = np.sin(x)
-# plt.plot(x, y)
-# plt.plot(x, der(y, h, 5, order=2))
-# plt.show()
-# print(der(y, h, 5, order=1))
-y_list_1 = [[h * np.conj(y) * H(y, x, h)]]
-normalization_list_1 = [[h * np.conj(y) * y]]
-num = len(y)
-p = 0.1
-plt.ion()
-fig = plt.figure()
-ax = fig.add_subplot(111)
-# ax.set_ylabel("f' mean relative error [%]")
-# ax.set_xlabel("x")
-line1, = ax.plot(x, np.abs(y), label='|Ψ(x)|')
-line2, = ax.plot(x, np.real(y), label='Re(Ψ(x))')
-line3, = ax.plot(x, np.imag(y), label='Imag(Ψ(x))')
-ax.legend()
-steps = 10000
-dt = 0.001
-# fig, axs = plt.subplots(2)
-
-for i in range(steps):
-    try:
-        y = runge_kutta(y, x, h, dt=dt)
-        line1.set_ydata(np.abs(y))
-        line2.set_ydata(np.real(y))
-        line3.set_ydata(np.imag(y))
-        fig.canvas.draw()
-        fig.canvas.flush_events()
-        y_list_1.append([h * np.conj(y) * H(y, x, h)])
-        normalization_list_1.append([h * np.conj(y) * y])
-    except KeyboardInterrupt:
-        pass
-
-# energies_1 = np.real(np.sum(np.concatenate(y_list_1, axis=0), axis=1))
-# normalization_1 = np.real(np.sum(np.concatenate(normalization_list_1, axis=0), axis=1))
-#
-# energy_error_1 = (energies_1[0]-energies_1) / energies_1[0]
-# normalization_error_1 = (1.-normalization_1) / normalization_1[0]
-#
-#
-# ##
-# def H(f, x, h):
-#     v = 1000*(barrier(x, 4, 5) + barrier(x, -5, -4))
-#     return -0.5 * der(f, h, 9, periodic=True, order=2) + f*v*0
-# y = psi(x, 0)
-# y_list_2 = [[h*np.conj(y)*H(y, x, h)]]
-# normalization_list_2 = [[h*np.conj(y)*y]]
-# num = len(y)
-# for i in range(steps):
-#     try:
-#         y = runge_kutta(y, x, h, dt=dt)
-#         y_list_2.append([h*np.conj(y)*H(y, x, h)])
-#         normalization_list_2.append([h*np.conj(y)*y])
-#     except KeyboardInterrupt:
-#         pass
-#
-# energies_2 = np.real(np.sum(np.concatenate(y_list_2, axis=0), axis=1))
-# normalization_2 = np.real(np.sum(np.concatenate(normalization_list_2, axis=0), axis=1))
-#
-# energy_error_2 = (energies_2[0]-energies_2) / energies_2[0]
-# normalization_error_2 = (1.-normalization_2) / normalization_2[0]
-# ##
-# def H(f, x, h):
-#     v = 1000*(barrier(x, 4, 5) + barrier(x, -5, -4))
-#     return -0.5 * der(f, h, 9, periodic=True, order=2) + f*v
-# y = psi(x, 10)
-# y_list_3 = [[h*np.conj(y)*H(y, x, h)]]
-# normalization_list_3 = [[h*np.conj(y)*y]]
-# num = len(y)
-# for i in range(steps):
-#     try:
-#         y = runge_kutta(y, x, h, dt=dt)
-#         y_list_3.append([h*np.conj(y)*H(y, x, h)])
-#         normalization_list_3.append([h*np.conj(y)*y])
-#     except KeyboardInterrupt:
-#         pass
-#
-# energies_3 = np.real(np.sum(np.concatenate(y_list_3, axis=0), axis=1))
-# normalization_3 = np.real(np.sum(np.concatenate(normalization_list_3, axis=0), axis=1))
-#
-# energy_error_3 = (energies_3[0]-energies_3) / energies_3[0]
-# normalization_error_3 = (1.-normalization_3) / normalization_3[0]
-# ##
-# def H(f, x, h):
-#     v = 1000*(barrier(x, 4, 5) + barrier(x, -5, -4))
-#     return -0.5 * der(f, h, 9, periodic=True, order=2) + f*v*0
-# y = psi(x, 10)
-# y_list_4 = [[h*np.conj(y)*H(y, x, h)]]
-# normalization_list_4 = [[h*np.conj(y)*y]]
-# num = len(y)
-# for i in range(steps):
-#     try:
-#         y = runge_kutta(y, x, h, dt=dt)
-#         y_list_4.append([h*np.conj(y)*H(y, x, h)])
-#         normalization_list_4.append([h*np.conj(y)*y])
-#     except KeyboardInterrupt:
-#         pass
-#
-# energies_4 = np.real(np.sum(np.concatenate(y_list_4, axis=0), axis=1))
-# normalization_4 = np.real(np.sum(np.concatenate(normalization_list_4, axis=0), axis=1))
-#
-# energy_error_4 = (energies_4[0]-energies_4) / energies_4[0]
-# normalization_error_4 = (1.-normalization_4) / normalization_4[0]
-#
-# ##
-# axs[0].semilogy(np.arange(steps+1), energy_error_1, label='p=0, Rigid boundary')
-# axs[0].semilogy(np.arange(steps+1), energy_error_2, label='p=0, Periodic boundary')
-# axs[0].semilogy(np.arange(steps+1), energy_error_3, label='p=10, Rigid boundary')
-# axs[0].semilogy(np.arange(steps+1), energy_error_4, label='p=10, Periodic boundary')
-# axs[0].set_ylabel("Energy")
-# axs[1].semilogy(np.arange(steps+1), normalization_error_1, label='p=0, Rigid boundary')
-# axs[1].semilogy(np.arange(steps+1), normalization_error_2, label='p=0, Periodic boundary')
-# axs[1].semilogy(np.arange(steps+1), normalization_error_3, label='p=10, Rigid boundary')
-# axs[1].semilogy(np.arange(steps+1), normalization_error_4, label='p=10, Periodic boundary')
-# axs[1].set_ylabel("Normalization")
-#
-# # plt.plot(np.arange(steps+1)*dt, energy_error, label='|Ψ(x)|')
-# axs[1].legend()
-# fig.suptitle("Relative errors [%], dt=0.001")
-# plt.xlabel("Time steps [dt]")
-# plt.ylabel("Relative error [%]")
-# plt.savefig("1_dt=0.001.pdf")
+run(-5, 5, 0, periodic=True, p=0, dx=5e-2, dt=0.001, t_max=10, plot=True)
+run(-5, 5, 0, periodic=True, p=5, dx=5e-2, dt=0.001, t_max=10, plot=True)
+run(-5, 5, 0, periodic=False, p=0, dx=5e-2, dt=0.001, t_max=10, plot=True)
+run(-5, 5, 0, periodic=False, p=5, dx=5e-2, dt=0.001, t_max=10, plot=True)
