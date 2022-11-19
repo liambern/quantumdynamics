@@ -234,6 +234,18 @@ def run(x_min, x_max, barriers=[], periodic=False, p=0, mu=0, dx=5e-2, dt=0.001,
     return energy_error, normalization_error, before_barrier, in_barrier, after_barrier
 
 
+def plot_dens(l, m, r, name):
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.axhline(y=0, color='k', alpha=0.5, )
+    ax.axhline(y=1, color='r', alpha=0.75, ls='--')
+    ax.plot(np.arange(steps+1), l, label='On the left')
+    ax.plot(np.arange(steps+1), m, label='In the barrier')
+    ax.plot(np.arange(steps+1), r, label='On the right')
+    ax.legend()
+    fig.suptitle("Integrated density")
+    plt.xlabel("Time steps [dt]")
+    plt.savefig(name+".pdf")
 # energy_error_1, normalization_error_1 = run(-5, 5, 0, periodic=True, p=0, dx=5e-2, dt=0.0001, t_max=1, plot=False)
 # energy_error_2, normalization_error_2 = run(-5, 5, 0, periodic=True, p=5, dx=5e-2, dt=0.0001, t_max=1, plot=False)
 # energy_error_3, normalization_error_3 = run(-5, 5, 0, periodic=False, p=0, dx=5e-2, dt=0.0001, t_max=1, plot=False)
@@ -241,50 +253,46 @@ def run(x_min, x_max, barriers=[], periodic=False, p=0, mu=0, dx=5e-2, dt=0.001,
 v0 = 10
 p = (2*v0)**0.5
 p1 = 0.1*p
-p2 = 0.9*p
-p3 = 1.1*p
-p4 = 2*p
+p2 = 0.25*p
+p3 = 0.5*p
+p4 = 0.9*p
 
 x_min = 0
 x_max = 100
 dt = 0.001
 t = 10
 dx = 5e-2
-plot = False
+plot = True
 periodic = False
-energy_error_1, normalization_error_1, l1, m1, r1 = run(x_min, x_max, barriers=[[v0, (x_max-x_min)/2-5, (x_max-x_min)/2+5]], periodic=periodic, p=p1, mu=(x_max-x_min)/2-10, dx=5e-2, dt=dt, t_max=t, plot=plot)
-energy_error_2, normalization_error_2, l2, m2, r2 = run(x_min, x_max, barriers=[[v0, (x_max-x_min)/2-5, (x_max-x_min)/2+5]], periodic=periodic, p=p2, mu=(x_max-x_min)/2-10, dx=5e-2, dt=dt, t_max=t, plot=plot)
-energy_error_3, normalization_error_3, l3, m3, r3 = run(x_min, x_max, barriers=[[v0, (x_max-x_min)/2-5, (x_max-x_min)/2+5]], periodic=periodic, p=p3, mu=(x_max-x_min)/2-10, dx=5e-2, dt=dt, t_max=t, plot=plot)
-energy_error_4, normalization_error_4, l4, m4, r4 = run(x_min, x_max, barriers=[[v0, (x_max-x_min)/2-5, (x_max-x_min)/2+5]], periodic=periodic, p=p4, mu=(x_max-x_min)/2-10, dx=5e-2, dt=dt, t_max=t, plot=plot)
+barriers = [[v0, (x_max-x_min)/2-5, (x_max-x_min)/2-2.5], [v0, (x_max-x_min)/2+2.5, (x_max-x_min)/2+5]]
+energy_error_1, normalization_error_1, l1, m1, r1 = run(x_min, x_max, barriers=barriers, periodic=periodic, p=p1, mu=(x_max-x_min)/2-10, dx=5e-2, dt=dt, t_max=t, plot=plot)
+energy_error_2, normalization_error_2, l2, m2, r2 = run(x_min, x_max, barriers=barriers, periodic=periodic, p=p2, mu=(x_max-x_min)/2-10, dx=5e-2, dt=dt, t_max=t, plot=plot)
+energy_error_3, normalization_error_3, l3, m3, r3 = run(x_min, x_max, barriers=barriers, periodic=periodic, p=p3, mu=(x_max-x_min)/2-10, dx=5e-2, dt=dt, t_max=t, plot=plot)
+energy_error_4, normalization_error_4, l4, m4, r4 = run(x_min, x_max, barriers=barriers, periodic=periodic, p=p4, mu=(x_max-x_min)/2-10, dx=5e-2, dt=dt, t_max=t, plot=plot)
 
 
 steps = len(energy_error_1)-1
-# fig, axs = plt.subplots(2)
-# axs[0].semilogy(np.arange(steps+1), energy_error_1, label='Rigid boundary, p=0.1V')
-# axs[0].semilogy(np.arange(steps+1), energy_error_2, label='Rigid boundary, p=0.9V')
-# axs[0].semilogy(np.arange(steps+1), energy_error_3, label='Rigid boundary, p=1.1V')
-# axs[0].semilogy(np.arange(steps+1), energy_error_4, label='Rigid boundary, p=10V')
-# axs[0].set_ylabel("Energy")
-# axs[1].semilogy(np.arange(steps+1), normalization_error_1, label='Rigid boundary, p=0.1V')
-# axs[1].semilogy(np.arange(steps+1), normalization_error_2, label='Rigid boundary, p=0.9V')
-# axs[1].semilogy(np.arange(steps+1), normalization_error_3, label='Rigid boundary, p=1.1V')
-# axs[1].semilogy(np.arange(steps+1), normalization_error_4, label='Rigid boundary, p=10V')
-# axs[1].set_ylabel("Normalization")
-#
-# axs[1].legend()
-# fig.suptitle("Relative errors [%], V=10")
-# plt.xlabel("Time steps [dt]")
-# plt.ylabel("Relative error [%]")
-# plt.savefig("3.pdf")
-# plt.savefig("1_dt=0.001.pdf")
+fig, axs = plt.subplots(2)
+axs[0].semilogy(np.arange(steps+1), energy_error_1, label='Rigid boundary, p=0.1V')
+axs[0].semilogy(np.arange(steps+1), energy_error_2, label='Rigid boundary, p=0.9V')
+axs[0].semilogy(np.arange(steps+1), energy_error_3, label='Rigid boundary, p=1.1V')
+axs[0].semilogy(np.arange(steps+1), energy_error_4, label='Rigid boundary, p=10V')
+axs[0].set_ylabel("Energy")
+axs[1].semilogy(np.arange(steps+1), normalization_error_1, label='Rigid boundary, p=0.1V')
+axs[1].semilogy(np.arange(steps+1), normalization_error_2, label='Rigid boundary, p=0.9V')
+axs[1].semilogy(np.arange(steps+1), normalization_error_3, label='Rigid boundary, p=1.1V')
+axs[1].semilogy(np.arange(steps+1), normalization_error_4, label='Rigid boundary, p=10V')
+axs[1].set_ylabel("Normalization")
 
-fig, ax = plt.subplot(111)
-ax.semilogy(np.arange(steps+1), l1, label='On the left')
-ax.semilogy(np.arange(steps+1), m1, label='In the barrier')
-ax.semilogy(np.arange(steps+1), r1, label='On the right')
-
-
-ax.legend()
-fig.suptitle("Integrated density")
+axs[1].legend()
+fig.suptitle("Relative errors [%], V=10")
 plt.xlabel("Time steps [dt]")
-plt.savefig("33.pdf")
+plt.ylabel("Relative error [%]")
+plt.savefig("4.pdf")
+
+
+
+plot_dens(l1, m1, r1, "d11")
+plot_dens(l2, m2, r2, "d22")
+plot_dens(l3, m3, r3, "d33")
+plot_dens(l4, m4, r4, "d44")
