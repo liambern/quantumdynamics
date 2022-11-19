@@ -126,7 +126,7 @@ def test(ff, dd1, dd2, h_list, s):
 # plt.savefig("img.pdf")
 
 
-def run(x_min, x_max, barriers, periodic=False, p=0, mu=0, dx=5e-2, dt=0.001, t_max=10, plot=False):
+def run(x_min, x_max, barriers=[], periodic=False, p=0, mu=0, dx=5e-2, dt=0.001, t_max=10, plot=False):
     if not periodic:
         x, h = grid(x_min - 1, x_max + 1, dx)
     else:
@@ -155,6 +155,19 @@ def run(x_min, x_max, barriers, periodic=False, p=0, mu=0, dx=5e-2, dt=0.001, t_
     y = y_list[0]
     energy_list = [[h * np.conj(y) * H(y, x, h)]]
     normalization_list = [[h * np.conj(y) * y]]
+    before_barrier = []
+    in_barrier = []
+    after_barrier = []
+    if len(barriers) > 0:
+        start = barriers[0][1]
+        end = barriers[-1][2]
+        left = barrier(x, x_min, start)
+        mid = barrier(x, start, end)
+        right = barrier(x, end, x_max)
+        before_barrier.append(normalization_list[-1]*left)
+        in_barrier.append(normalization_list[-1]*mid)
+        after_barrier.append(normalization_list[-1]*right)
+
     if plot:
         fig = plt.figure()
         ax = fig.add_subplot(111)
@@ -189,6 +202,10 @@ def run(x_min, x_max, barriers, periodic=False, p=0, mu=0, dx=5e-2, dt=0.001, t_
                 y_list[0] = y
                 energy_list.append([h * np.conj(y) * H(y, x, h)])
                 normalization_list.append([h * np.conj(y) * y])
+                if len(barriers) > 0:
+                    before_barrier.append(normalization_list[-1] * left)
+                    in_barrier.append(normalization_list[-1] * mid)
+                    after_barrier.append(normalization_list[-1] * right)
             line1.set_ydata(np.abs(y))
             line2.set_ydata(np.real(y))
             line3.set_ydata(np.imag(y))
@@ -202,11 +219,19 @@ def run(x_min, x_max, barriers, periodic=False, p=0, mu=0, dx=5e-2, dt=0.001, t_
             y_list[0] = y
             energy_list.append([h * np.conj(y) * H(y, x, h)])
             normalization_list.append([h * np.conj(y) * y])
+            if len(barriers) > 0:
+                before_barrier.append(normalization_list[-1] * left)
+                in_barrier.append(normalization_list[-1] * mid)
+                after_barrier.append(normalization_list[-1] * right)
     energies = np.real(np.sum(np.concatenate(energy_list, axis=0), axis=1))
     normalization = np.real(np.sum(np.concatenate(normalization_list, axis=0), axis=1))
     energy_error = 100. * np.abs((energies[0] - energies) / energies[0])
     normalization_error = 100. * np.abs((1. - normalization))
-    return energy_error, normalization_error
+    if len(barriers) > 0:
+        before_barrier = np.real(np.sum(np.concatenate(before_barrier, axis=0), axis=1))
+        in_barrier = np.real(np.sum(np.concatenate(in_barrier, axis=0), axis=1))
+        after_barrier = np.real(np.sum(np.concatenate(after_barrier, axis=0), axis=1))
+    return energy_error, normalization_error, before_barrier, in_barrier, after_barrier
 
 
 # energy_error_1, normalization_error_1 = run(-5, 5, 0, periodic=True, p=0, dx=5e-2, dt=0.0001, t_max=1, plot=False)
@@ -223,32 +248,43 @@ p4 = 2*p
 x_min = 0
 x_max = 100
 dt = 0.001
-t = 0.5
+t = 10
 dx = 5e-2
-plot = True
+plot = False
 periodic = False
-energy_error_1, normalization_error_1 = run(x_min, x_max, barriers=[[v0, (x_max-x_min)/2-5, (x_max-x_min)/2+5]], periodic=periodic, p=p1, mu=(x_max-x_min)/2-10, dx=5e-2, dt=dt, t_max=t, plot=plot)
-energy_error_2, normalization_error_2 = run(x_min, x_max, barriers=[[v0, (x_max-x_min)/2-5, (x_max-x_min)/2+5]], periodic=periodic, p=p2, mu=(x_max-x_min)/2-10, dx=5e-2, dt=dt, t_max=t, plot=plot)
-energy_error_3, normalization_error_3 = run(x_min, x_max, barriers=[[v0, (x_max-x_min)/2-5, (x_max-x_min)/2+5]], periodic=periodic, p=p3, mu=(x_max-x_min)/2-10, dx=5e-2, dt=dt, t_max=t, plot=plot)
-energy_error_4, normalization_error_4 = run(x_min, x_max, barriers=[[v0, (x_max-x_min)/2-5, (x_max-x_min)/2+5]], periodic=periodic, p=p4, mu=(x_max-x_min)/2-10, dx=5e-2, dt=dt, t_max=t, plot=plot)
+energy_error_1, normalization_error_1, l1, m1, r1 = run(x_min, x_max, barriers=[[v0, (x_max-x_min)/2-5, (x_max-x_min)/2+5]], periodic=periodic, p=p1, mu=(x_max-x_min)/2-10, dx=5e-2, dt=dt, t_max=t, plot=plot)
+energy_error_2, normalization_error_2, l2, m2, r2 = run(x_min, x_max, barriers=[[v0, (x_max-x_min)/2-5, (x_max-x_min)/2+5]], periodic=periodic, p=p2, mu=(x_max-x_min)/2-10, dx=5e-2, dt=dt, t_max=t, plot=plot)
+energy_error_3, normalization_error_3, l3, m3, r3 = run(x_min, x_max, barriers=[[v0, (x_max-x_min)/2-5, (x_max-x_min)/2+5]], periodic=periodic, p=p3, mu=(x_max-x_min)/2-10, dx=5e-2, dt=dt, t_max=t, plot=plot)
+energy_error_4, normalization_error_4, l4, m4, r4 = run(x_min, x_max, barriers=[[v0, (x_max-x_min)/2-5, (x_max-x_min)/2+5]], periodic=periodic, p=p4, mu=(x_max-x_min)/2-10, dx=5e-2, dt=dt, t_max=t, plot=plot)
 
 
 steps = len(energy_error_1)-1
-fig, axs = plt.subplots(2)
-axs[0].semilogy(np.arange(steps+1), energy_error_1, label='Rigid boundary, p=0.1V')
-axs[0].semilogy(np.arange(steps+1), energy_error_2, label='Rigid boundary, p=0.9V')
-axs[0].semilogy(np.arange(steps+1), energy_error_3, label='Rigid boundary, p=1.1V')
-axs[0].semilogy(np.arange(steps+1), energy_error_4, label='Rigid boundary, p=10V')
-axs[0].set_ylabel("Energy")
-axs[1].semilogy(np.arange(steps+1), normalization_error_1, label='Rigid boundary, p=0.1V')
-axs[1].semilogy(np.arange(steps+1), normalization_error_2, label='Rigid boundary, p=0.9V')
-axs[1].semilogy(np.arange(steps+1), normalization_error_3, label='Rigid boundary, p=1.1V')
-axs[1].semilogy(np.arange(steps+1), normalization_error_4, label='Rigid boundary, p=10V')
-axs[1].set_ylabel("Normalization")
-
-axs[1].legend()
-fig.suptitle("Relative errors [%], V=10")
-plt.xlabel("Time steps [dt]")
-plt.ylabel("Relative error [%]")
-plt.savefig("3.pdf")
+# fig, axs = plt.subplots(2)
+# axs[0].semilogy(np.arange(steps+1), energy_error_1, label='Rigid boundary, p=0.1V')
+# axs[0].semilogy(np.arange(steps+1), energy_error_2, label='Rigid boundary, p=0.9V')
+# axs[0].semilogy(np.arange(steps+1), energy_error_3, label='Rigid boundary, p=1.1V')
+# axs[0].semilogy(np.arange(steps+1), energy_error_4, label='Rigid boundary, p=10V')
+# axs[0].set_ylabel("Energy")
+# axs[1].semilogy(np.arange(steps+1), normalization_error_1, label='Rigid boundary, p=0.1V')
+# axs[1].semilogy(np.arange(steps+1), normalization_error_2, label='Rigid boundary, p=0.9V')
+# axs[1].semilogy(np.arange(steps+1), normalization_error_3, label='Rigid boundary, p=1.1V')
+# axs[1].semilogy(np.arange(steps+1), normalization_error_4, label='Rigid boundary, p=10V')
+# axs[1].set_ylabel("Normalization")
+#
+# axs[1].legend()
+# fig.suptitle("Relative errors [%], V=10")
+# plt.xlabel("Time steps [dt]")
+# plt.ylabel("Relative error [%]")
+# plt.savefig("3.pdf")
 # plt.savefig("1_dt=0.001.pdf")
+
+fig, ax = plt.subplot(111)
+ax.semilogy(np.arange(steps+1), l1, label='On the left')
+ax.semilogy(np.arange(steps+1), m1, label='In the barrier')
+ax.semilogy(np.arange(steps+1), r1, label='On the right')
+
+
+ax.legend()
+fig.suptitle("Integrated density")
+plt.xlabel("Time steps [dt]")
+plt.savefig("33.pdf")
