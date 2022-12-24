@@ -102,6 +102,7 @@ def run(x_min, x_max, c0, c1, barriers=[], periodic=False, k=1, m=1, dx=5e-2, dt
     else:
         x, h = grid(x_min, x_max, 5e-2)
 
+
     def H(f, x, h):
         v = 0.
         for params in barriers: #list of lists, in the form [v, x_min, x_max]
@@ -110,6 +111,10 @@ def run(x_min, x_max, c0, c1, barriers=[], periodic=False, k=1, m=1, dx=5e-2, dt
             v += 1000 * (barrier(x, x_max, x_max + 1) + barrier(x, x_min - 1, x_min))
         v_harmonic = 0.5 * k * x**2.
         return -0.5 * der(f, h, 9, periodic=True, order=2) + f * (v + v_harmonic)
+
+
+    def P(f, x, h):
+        return -1.j * hbar * der(f, h, 9, periodic=True, order=2)
 
     def f_dde(y, x, t, h):
         return -1.j * H(y, x, h)
@@ -126,6 +131,8 @@ def run(x_min, x_max, c0, c1, barriers=[], periodic=False, k=1, m=1, dx=5e-2, dt
     y = y_list[0]
     energy_list = [[h * np.conj(y) * H(y, x, h)]]
     normalization_list = [[h * np.conj(y) * y]]
+    x_list = [[h * np.conj(y) * x * y]]
+    p_list = [[h * np.conj(y) * P(y, x, h)]]
     before_barrier = []
     in_barrier = []
     after_barrier = []
@@ -173,6 +180,8 @@ def run(x_min, x_max, c0, c1, barriers=[], periodic=False, k=1, m=1, dx=5e-2, dt
                 y_list[0] = y
                 energy_list.append([h * np.conj(y) * H(y, x, h)])
                 normalization_list.append([h * np.conj(y) * y])
+                x_list.append([h * np.conj(y) * x * y])
+                p_list.append([h * np.conj(y) * P(y, x, h)])
                 if len(barriers) > 0:
                     before_barrier.append(normalization_list[-1] * left)
                     in_barrier.append(normalization_list[-1] * mid)
@@ -190,22 +199,28 @@ def run(x_min, x_max, c0, c1, barriers=[], periodic=False, k=1, m=1, dx=5e-2, dt
             y_list[0] = y
             energy_list.append([h * np.conj(y) * H(y, x, h)])
             normalization_list.append([h * np.conj(y) * y])
+            x_list.append([h * np.conj(y) * x * y])
+            p_list.append([h * np.conj(y) * P(y, x, h)])
             if len(barriers) > 0:
                 before_barrier.append(normalization_list[-1] * left)
                 in_barrier.append(normalization_list[-1] * mid)
                 after_barrier.append(normalization_list[-1] * right)
     energies = np.real(np.sum(np.concatenate(energy_list, axis=0), axis=1))
     normalization = np.real(np.sum(np.concatenate(normalization_list, axis=0), axis=1))
+    mean_x = np.real(np.sum(np.concatenate(x_list, axis=0), axis=1))
+    mean_p = np.real(np.sum(np.concatenate(p_list, axis=0), axis=1))
     energy_error = 100. * np.abs((energies[0] - energies) / energies[0])
     normalization_error = 100. * np.abs((1. - normalization))
     if len(barriers) > 0:
         before_barrier = np.real(np.sum(np.concatenate(before_barrier, axis=0), axis=1))
         in_barrier = np.real(np.sum(np.concatenate(in_barrier, axis=0), axis=1))
         after_barrier = np.real(np.sum(np.concatenate(after_barrier, axis=0), axis=1))
-    return energy_error, normalization_error, before_barrier, in_barrier, after_barrier
+    return energy_error, normalization_error, mean_x, mean_p, before_barrier, in_barrier, after_barrier
 
 
 cases0 = [0., 0.4, 1/2**0.5, 1/2**0.5, np.exp(-0.1*np.pi*1.j)/2**0.5, (1-0.4**2.)**0.5, 1.]
-cases1 = [1., (1-0.4**2.)**0.5, 1/2**0.5, -1/2**0.5, 1/2**0.5, 0.4, 0.]
+cases1 = [1., (1-0.4**2.)**0.5, 1/2**0.5, -1/2**0.5, 1/2**0.5, 0.4, 0.] ##fixme make that plot will show imagenary nambers
 for i in range(len(cases0)):
-    energy_error, normalization_error, _, _, _ = run(-5, 5, cases0[i], cases1[i], barriers=[], periodic=False, k=1, m=1, dx=5e-2, dt=0.001, t_max=1, plot=True)
+    energy_error, normalization_error, mean_x, mean_p, _, _, _ = run(-5, 5, cases0[i], cases1[i], barriers=[], periodic=False, k=1, m=1, dx=5e-2, dt=0.001, t_max=1, plot=True)
+    print(mean_x)
+    print(mean_p)
