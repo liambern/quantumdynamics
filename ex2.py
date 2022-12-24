@@ -96,20 +96,21 @@ def exact_phi(x, t, c0, c1, k=1, m=1):
     return c0*f0*np.exp(in_exp_t) + c1*f1*np.exp(3*in_exp_t)
 
 
-def run(x_min, x_max, c0, c1, barriers=[], periodic=False, k=1, m=1, dx=5e-2, dt=0.001, t_max=10, plot=False):
+def run(x_min, x_max, c0, c1, barriers=[], periodic=False, k=1, m=1, dx=5e-2, dk=0., tc=1., sigma=1, dt=0.001, t_max=10, plot=False):
+    time = 0.
     if not periodic:
         x, h = grid(x_min - 1, x_max + 1, dx)
     else:
         x, h = grid(x_min, x_max, 5e-2)
 
 
-    def H(f, x, h):
+    def H(f, x, h, t):
         v = 0.
         for params in barriers: #list of lists, in the form [v, x_min, x_max]
             v += params[0]*barrier(x, params[1], params[2])
         if not periodic:
             v += 1000 * (barrier(x, x_max, x_max + 1) + barrier(x, x_min - 1, x_min))
-        v_harmonic = 0.5 * k * x**2.
+        v_harmonic = 0.5 * k * x**2. + 0.5 * dk * x**2. * np.exp(-(t-tc)**2./(2.*sigma**2.))
         return -0.5 * der(f, h, 9, periodic=True, order=2) + f * (v + v_harmonic)
 
 
@@ -117,7 +118,7 @@ def run(x_min, x_max, c0, c1, barriers=[], periodic=False, k=1, m=1, dx=5e-2, dt
         return -1.j * hbar * der(f, h, 9, periodic=True, order=2)
 
     def f_dde(y, x, t, h):
-        return -1.j * H(y, x, h)
+        return -1.j * H(y, x, h, t)
 
     def runge_kutta(psi_0, x, h, dt):
         t0 = 0.
@@ -129,7 +130,7 @@ def run(x_min, x_max, c0, c1, barriers=[], periodic=False, k=1, m=1, dx=5e-2, dt
 
     y_list = [initial_phi(x, c0, c1, k=k, m=m)]
     y = y_list[0]
-    energy_list = [[h * np.conj(y) * H(y, x, h)]]
+    energy_list = [[h * np.conj(y) * H(y, x, h, time)]]
     normalization_list = [[h * np.conj(y) * y]]
     x_list = [[h * np.conj(y) * x * y]]
     p_list = [[h * np.conj(y) * P(y, x, h)]]
@@ -175,10 +176,12 @@ def run(x_min, x_max, c0, c1, barriers=[], periodic=False, k=1, m=1, dx=5e-2, dt
         frame_skip = 4  # frame spacings to not plot, for memory reasons
 
         def animate(i):
+            time = 0.
             for k in range(frame_skip):
                 y = runge_kutta(y_list[0], x, h, dt=dt)
+                time += dt
                 y_list[0] = y
-                energy_list.append([h * np.conj(y) * H(y, x, h)])
+                energy_list.append([h * np.conj(y) * H(y, x, h, time)])
                 normalization_list.append([h * np.conj(y) * y])
                 x_list.append([h * np.conj(y) * x * y])
                 p_list.append([h * np.conj(y) * P(y, x, h)])
@@ -196,8 +199,9 @@ def run(x_min, x_max, c0, c1, barriers=[], periodic=False, k=1, m=1, dx=5e-2, dt
     else:
         for k in range(int(t_max / dt)):
             y = runge_kutta(y_list[0], x, h, dt=dt)
+            time += dt
             y_list[0] = y
-            energy_list.append([h * np.conj(y) * H(y, x, h)])
+            energy_list.append([h * np.conj(y) * H(y, x, h, time)])
             normalization_list.append([h * np.conj(y) * y])
             x_list.append([h * np.conj(y) * x * y])
             p_list.append([h * np.conj(y) * P(y, x, h)])
@@ -220,7 +224,21 @@ def run(x_min, x_max, c0, c1, barriers=[], periodic=False, k=1, m=1, dx=5e-2, dt
 
 cases0 = [0., 0.4, 1/2**0.5, 1/2**0.5, np.exp(-0.1*np.pi*1.j)/2**0.5, (1-0.4**2.)**0.5, 1.]
 cases1 = [1., (1-0.4**2.)**0.5, 1/2**0.5, -1/2**0.5, 1/2**0.5, 0.4, 0.] ##fixme make that plot will show imagenary nambers
-for i in range(len(cases0)):
-    energy_error, normalization_error, mean_x, mean_p, _, _, _ = run(-5, 5, cases0[i], cases1[i], barriers=[], periodic=False, k=1, m=1, dx=5e-2, dt=0.001, t_max=1, plot=True)
-    print(mean_x)
-    print(mean_p)
+# for i in range(len(cases0)):
+#     energy_error, normalization_error, mean_x, mean_p, _, _, _ = run(-5, 5, cases0[i], cases1[i], barriers=[], periodic=False, k=1, m=1, dx=5e-2, dt=0.001, t_max=1, plot=True)
+#     print(mean_x)
+#     print(mean_p)
+energy_error, normalization_error, mean_x, mean_p, _, _, _ = run(-5, 5, 1., 0., barriers=[],
+                                                                 periodic=False, k=1, m=1, dx=5e-2, dt=0.001, t_max=1,
+                                                                 plot=True, dk=0.1, tc=0.5)
+steps = len(energy_error)-1
+fig, axs = plt.subplots(2)
+axs[0].semilogy(np.arange(steps+1), energy_error, label='Periodic boundary, p=0')
+axs[0].set_ylabel("Energy")
+axs[1].semilogy(np.arange(steps+1), normalization_error, label='Periodic boundary, p=0')
+axs[1].set_ylabel("Normalization")
+
+axs[1].legend()
+fig.suptitle("Relative errors [%], dt=0.001")
+plt.xlabel("Time steps [dt]")
+plt.show()
