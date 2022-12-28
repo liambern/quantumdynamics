@@ -96,8 +96,7 @@ def exact_phi(x, t, c0, c1, k=1, m=1):
     return c0*f0*np.exp(in_exp_t) + c1*f1*np.exp(3*in_exp_t)
 
 
-def run(x_min, x_max, c0, c1, barriers=[], periodic=False, k=1, m=1, dx=5e-2, dk=0., tc=1., sigma=1, dt=0.001, t_max=10, plot=False):
-    time = 0.
+def run(x_min, x_max, c0, c1, periodic=False, k=1, m=1, dx=5e-2, dk=0., tc=1., sigma=1, dt=0.001, t_max=10, plot=False):
     if not periodic:
         x, h = grid(x_min - 1, x_max + 1, dx)
     else:
@@ -106,8 +105,6 @@ def run(x_min, x_max, c0, c1, barriers=[], periodic=False, k=1, m=1, dx=5e-2, dk
 
     def H(f, x, h, t):
         v = 0.
-        for params in barriers: #list of lists, in the form [v, x_min, x_max]
-            v += params[0]*barrier(x, params[1], params[2])
         if not periodic:
             v += 1000 * (barrier(x, x_max, x_max + 1) + barrier(x, x_min - 1, x_min))
         v_harmonic = 0.5 * k * x**2. + 0.5 * dk * x**2. * np.exp(-(t-tc)**2./(2.*sigma**2.))
@@ -115,13 +112,12 @@ def run(x_min, x_max, c0, c1, barriers=[], periodic=False, k=1, m=1, dx=5e-2, dk
 
 
     def P(f, x, h):
-        return -1.j * hbar * der(f, h, 9, periodic=True, order=2)
+        return -1.j * hbar * der(f, h, 9, periodic=True, order=1)
 
     def f_dde(y, x, t, h):
         return -1.j * H(y, x, h, t)
 
-    def runge_kutta(psi_0, x, h, dt):
-        t0 = 0.
+    def runge_kutta(psi_0, x, h, dt, t0):
         k1 = dt * f_dde(psi_0, x, t0, h)
         k2 = dt * f_dde(psi_0 + k1 / 2, x, t0 + dt / 2., h)
         k3 = dt * f_dde(psi_0 + k2 / 2, x, t0 + dt / 2., h)
@@ -129,45 +125,26 @@ def run(x_min, x_max, c0, c1, barriers=[], periodic=False, k=1, m=1, dx=5e-2, dk
         return psi_0 + (k1 + 2. * k2 + 2. * k3 + k4) / 6
 
     y_list = [initial_phi(x, c0, c1, k=k, m=m)]
+    time_list = [0.]
     y = y_list[0]
-    energy_list = [[h * np.conj(y) * H(y, x, h, time)]]
-    normalization_list = [[h * np.conj(y) * y]]
-    x_list = [[h * np.conj(y) * x * y]]
-    p_list = [[h * np.conj(y) * P(y, x, h)]]
-    before_barrier = []
-    in_barrier = []
-    after_barrier = []
-    if len(barriers) > 0:
-        start = barriers[0][1]
-        end = barriers[-1][2]
-        left = barrier(x, x_min, start)
-        mid = barrier(x, start, end)
-        right = barrier(x, end, x_max)
-        before_barrier.append(normalization_list[-1]*left)
-        in_barrier.append(normalization_list[-1]*mid)
-        after_barrier.append(normalization_list[-1]*right)
+    energy_list = [np.sum(h * np.conj(y) * H(y, x, h, time_list[0]))]
+    normalization_list = [np.sum(h * np.conj(y) * y)]
+    x_list = [np.sum(h * np.conj(y) * x * y)]
+    p_list = [np.sum(h * np.conj(y) * P(y, x, h))]
+
 
     if plot:
         fig = plt.figure()
         ax = fig.add_subplot(111)
-        title = ''
-        if periodic:
-            title += 'Periodic boundary, '
-        else:
-            ax.axvline(x_min, c='r', ls='--')
-            ax.axvline(x_max, c='r', ls='--')
-            title += 'Rigid boundary, '
-        title += 'c0={c0}, c1={c1}, duration={t_run} (all variables in atomic units)'.format(c0=str(c0)[:5], c1=str(c1)[:5], t_run=str(t_max))
+        title = 'c0={c0}, c1={c1}, duration={t_run}'.format(c0=complex(round(c0.real, 5), round(c0.imag, 5)), c1=complex(round(c1.real, 5), round(c1.imag, 5)), t_run=str(t_max))
         fig.suptitle(title)
         ax.set_ylim([-1, 1])
         ax.set_xlim([x[0], x[-1]])
         ax.grid(True, which='both', ls='--')
         ax.axhline(y=0, color='k', alpha=0.75)
         ax.set_axisbelow(True)
-        for params in barriers:
-            rect = patches.Rectangle((params[1], 0), params[2]-params[1], params[0], edgecolor='m', ls='dashed', facecolor='none')
-            ax.add_patch(rect)
         ax.set_xlabel("X")
+        # y_err = exact_phi(x, time, c0=c0, c1=c1, k=k, m=m) - y
         line1, = ax.plot(x, np.abs(y), label='|Ψ(x)|')
         line2, = ax.plot(x, np.real(y), label='Re(Ψ(x))')
         line3, = ax.plot(x, np.imag(y), label='Imag(Ψ(x))')
@@ -176,69 +153,63 @@ def run(x_min, x_max, c0, c1, barriers=[], periodic=False, k=1, m=1, dx=5e-2, dk
         frame_skip = 4  # frame spacings to not plot, for memory reasons
 
         def animate(i):
-            time = 0.
             for k in range(frame_skip):
-                y = runge_kutta(y_list[0], x, h, dt=dt)
-                time += dt
+                y = runge_kutta(y_list[0], x, h, dt, time_list[0])
+                time_list[0] += dt
                 y_list[0] = y
-                energy_list.append([h * np.conj(y) * H(y, x, h, time)])
-                normalization_list.append([h * np.conj(y) * y])
-                x_list.append([h * np.conj(y) * x * y])
-                p_list.append([h * np.conj(y) * P(y, x, h)])
-                if len(barriers) > 0:
-                    before_barrier.append(normalization_list[-1] * left)
-                    in_barrier.append(normalization_list[-1] * mid)
-                    after_barrier.append(normalization_list[-1] * right)
+                energy_list.append(np.sum(h * np.conj(y) * H(y, x, h, time_list[0])))
+                normalization_list.append(np.sum(h * np.conj(y) * y))
+                x_list.append(np.sum(h * np.conj(y) * x * y))
+                p_list.append(np.sum(h * np.conj(y) * P(y, x, h)))
+            # y_err = exact_phi(x, time, c0=c0, c1=c1, k=k, m=m) - y
             line1.set_ydata(np.abs(y))
             line2.set_ydata(np.real(y))
             line3.set_ydata(np.imag(y))
             return line1, line2, line3
         ani = FuncAnimation(fig, animate, frames=int((t_max / dt) / frame_skip), blit=True)
-        ani.save("max={max},min={min},c0={c0},c1={c1},periodic={periodic}.gif".format(max=str(x_max), min=str(x_min), c0=str(c0)[:5], c1=str(c1)[:5],
+        ani.save("max={max},min={min},c0={c0},c1={c1},periodic={periodic},error.gif".format(max=str(x_max), min=str(x_min), c0=str(c0)[:5], c1=str(c1)[:5],
                 periodic=str(periodic)), dpi=250, writer=PillowWriter(fps=50))
     else:
         for k in range(int(t_max / dt)):
-            y = runge_kutta(y_list[0], x, h, dt=dt)
-            time += dt
+            y = runge_kutta(y_list[0], x, h, dt, time_list[0])
+            time_list[0] += dt
             y_list[0] = y
-            energy_list.append([h * np.conj(y) * H(y, x, h, time)])
-            normalization_list.append([h * np.conj(y) * y])
-            x_list.append([h * np.conj(y) * x * y])
-            p_list.append([h * np.conj(y) * P(y, x, h)])
-            if len(barriers) > 0:
-                before_barrier.append(normalization_list[-1] * left)
-                in_barrier.append(normalization_list[-1] * mid)
-                after_barrier.append(normalization_list[-1] * right)
-    energies = np.real(np.sum(np.concatenate(energy_list, axis=0), axis=1))
-    normalization = np.real(np.sum(np.concatenate(normalization_list, axis=0), axis=1))
-    mean_x = np.real(np.sum(np.concatenate(x_list, axis=0), axis=1))
-    mean_p = np.real(np.sum(np.concatenate(p_list, axis=0), axis=1))
-    energy_error = 100. * np.abs((energies[0] - energies) / energies[0])
+            energy_list.append(np.sum(h * np.conj(y) * H(y, x, h, time_list[0])))
+            normalization_list.append(np.sum(h * np.conj(y) * y))
+            x_list.append(np.sum(h * np.conj(y) * x * y))
+            p_list.append(np.sum(h * np.conj(y) * P(y, x, h)))
+
+    energies = np.real(energy_list)
+    normalization = np.real(normalization_list)
+    mean_x = np.real(x_list)
+    mean_p = np.real(p_list)
+    # exact_energy = c0**2. * 0.5 + c1**2. * 1.5
+    exact_energy = energies[0]
+    energy_error = 100. * np.abs((exact_energy - energies) / exact_energy)
     normalization_error = 100. * np.abs((1. - normalization))
-    if len(barriers) > 0:
-        before_barrier = np.real(np.sum(np.concatenate(before_barrier, axis=0), axis=1))
-        in_barrier = np.real(np.sum(np.concatenate(in_barrier, axis=0), axis=1))
-        after_barrier = np.real(np.sum(np.concatenate(after_barrier, axis=0), axis=1))
-    return energy_error, normalization_error, mean_x, mean_p, before_barrier, in_barrier, after_barrier
+
+    return energy_error, normalization_error, mean_x, mean_p
 
 
 cases0 = [0., 0.4, 1/2**0.5, 1/2**0.5, np.exp(-0.1*np.pi*1.j)/2**0.5, (1-0.4**2.)**0.5, 1.]
-cases1 = [1., (1-0.4**2.)**0.5, 1/2**0.5, -1/2**0.5, 1/2**0.5, 0.4, 0.] ##fixme make that plot will show imagenary nambers
-# for i in range(len(cases0)):
-#     energy_error, normalization_error, mean_x, mean_p, _, _, _ = run(-5, 5, cases0[i], cases1[i], barriers=[], periodic=False, k=1, m=1, dx=5e-2, dt=0.001, t_max=1, plot=True)
-#     print(mean_x)
-#     print(mean_p)
-energy_error, normalization_error, mean_x, mean_p, _, _, _ = run(-5, 5, 1., 0., barriers=[],
-                                                                 periodic=False, k=1, m=1, dx=5e-2, dt=0.001, t_max=1,
-                                                                 plot=True, dk=0.1, tc=0.5)
-steps = len(energy_error)-1
-fig, axs = plt.subplots(2)
-axs[0].semilogy(np.arange(steps+1), energy_error, label='Periodic boundary, p=0')
-axs[0].set_ylabel("Energy")
-axs[1].semilogy(np.arange(steps+1), normalization_error, label='Periodic boundary, p=0')
-axs[1].set_ylabel("Normalization")
+cases1 = [1., (1-0.4**2.)**0.5, 1/2**0.5, -1/2**0.5, 1/2**0.5, 0.4, 0.]
+for i in range(len(cases0)):
+    energy_error, normalization_error, mean_x, mean_p = run(-5, 5, cases0[i], cases1[i], periodic=False, k=1, m=1, dx=5e-2, dt=0.001, t_max=5, plot=True)
+    steps = len(energy_error) - 1
+    fig, axs = plt.subplots(2)
+    axs[0].semilogy(np.arange(steps + 1), energy_error, label='With respect to the exact value')
+    axs[0].set_ylabel("Energy")
 
-axs[1].legend()
-fig.suptitle("Relative errors [%], dt=0.001")
-plt.xlabel("Time steps [dt]")
-plt.show()
+    axs[1].semilogy(np.arange(steps + 1), normalization_error, label='Periodic boundary, p=0')
+    axs[1].set_ylabel("Normalization")
+
+    axs[0].legend()
+    fig.suptitle("Relative errors [%], dt=0.001")
+    plt.xlabel("Time steps [dt]")
+    plt.savefig(str(i)+"errors.svg")
+    plt.clf()
+    plt.scatter(mean_p, mean_x)
+    plt.ylabel("<p>(t)")
+    plt.xlabel("<x>(t)")
+    plt.title("Phase-space sampling over 5 time units")
+    plt.savefig(str(i)+"five.svg")
