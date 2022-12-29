@@ -270,4 +270,5 @@ for i in range(1):
     for ci in range(len(cs_lists)):
         plt.semilogy(np.arange(steps + 1), cs_lists[ci], label='|C'+str(ci)+ '|^2')
     plt.legend()
+    plt.xlabel("Time steps [dt]")
     plt.savefig(str(i) + "population.svg")
