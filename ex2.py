@@ -166,19 +166,19 @@ def run(x_min, x_max, c0, c1, periodic=False, k=1, m=1, dx=5e-2, dk=0., tc=1., s
         title = 'c0={c0}, c1={c1}, duration={t_run}'.format(c0=complex(round(c0.real, 5), round(c0.imag, 5)), c1=complex(round(c1.real, 5), round(c1.imag, 5)), t_run=str(t_max))
         # title = 'Ψ_exact - Ψ_numerical'
         fig.suptitle(title)
-        ax.set_ylim([-2e-5, 2e-5])
+        ax.set_ylim([-1, 1.])
         ax.set_xlim([x[0], x[-1]])
         ax.grid(True, which='both', ls='--')
         ax.axhline(y=0, color='k', alpha=0.75)
         ax.set_axisbelow(True)
         ax.set_xlabel("X")
         # y_err = exact_phi(x, time_list[0], c0=c0, c1=c1, k=k, m=m) - y
-        line1, = ax.plot(x, np.abs(y), label='|Ψ(x)|')
+        line1, = ax.plot(x, np.abs(y)**2., label='|Ψ(x)|^2')
         line2, = ax.plot(x, np.real(y), label='Re(Ψ(x))')
         line3, = ax.plot(x, np.imag(y), label='Imag(Ψ(x))')
         ax.legend()
 
-        frame_skip = 4  # frame spacings to not plot, for memory reasons
+        frame_skip = 400  # frame spacings to not plot, for memory reasons
 
         def animate(i):
             for kkk in range(frame_skip):
@@ -189,13 +189,18 @@ def run(x_min, x_max, c0, c1, periodic=False, k=1, m=1, dx=5e-2, dk=0., tc=1., s
                 normalization_list.append(np.sum(h * np.conj(y) * y))
                 x_list.append(np.sum(h * np.conj(y) * x * y))
                 p_list.append(np.sum(h * np.conj(y) * P(y, x, h)))
+                c0_list.append(np.abs(np.sum(h * np.conj(phi_0(x, k, m)) * y)) ** 2.)
+                c1_list.append(np.abs(np.sum(h * np.conj(phi_1(x, k, m)) * y)) ** 2.)
+                c2_list.append(np.abs(np.sum(h * np.conj(phi_2(x, k, m)) * y)) ** 2.)
+                c3_list.append(np.abs(np.sum(h * np.conj(phi_3(x, k, m)) * y)) ** 2.)
+                c4_list.append(np.abs(np.sum(h * np.conj(phi_4(x, k, m)) * y)) ** 2.)
             # y_err = exact_phi(x, time_list[0], c0=c0, c1=c1, k=k, m=m) - y
-            line1.set_ydata(np.abs(y))
+            line1.set_ydata(np.abs(y)**2.)
             line2.set_ydata(np.real(y))
             line3.set_ydata(np.imag(y))
             return line1, line2, line3
         ani = FuncAnimation(fig, animate, frames=int((t_max / dt) / frame_skip), blit=True)
-        ani.save("four.gif".format(max=str(x_max), min=str(x_min), c0=str(c0)[:5], c1=str(c1)[:5],
+        ani.save(str(dk)+str(sigma)+"adi.gif".format(max=str(x_max), min=str(x_min), c0=str(c0)[:5], c1=str(c1)[:5],
                 periodic=str(periodic)), dpi=250, writer=PillowWriter(fps=50))
     else:
         for i in range(int((t_max / dt))):
@@ -251,24 +256,57 @@ t_max = 6.5
 #     cbar.set_label("Time")
 #     plt.savefig(str(i)+"five.svg")
 
+def prob(dk, k, m, sigma):
+    omega = k / m**0.5
+    return (np.pi * dk**2. * sigma**2. / (4* m**2. * omega**2.)) * np.exp(-4*sigma**2.*omega**2.)
+
 #part 2
-t_max = 10
-for i in range(1):
-    energy_error, normalization_error, mean_x, mean_p, cs_lists = run(-5, 5, 1., 0., periodic=False, k=1, m=1, dx=5e-2, dt=0.001, dk=1, tc=5, sigma=1, t_max=t_max, plot=False)
-    steps = len(energy_error) - 1
-    fig, axs = plt.subplots(2)
-    axs[0].plot(np.arange(steps + 1), energy_error, label='With respect to the exact value')
-    axs[0].set_ylabel("Energy")
+#adiabatic
+t_max = 100
+dk = 0.1
+energy_error, normalization_error, mean_x, mean_p, cs_lists = run(-5, 5, 1., 0., periodic=False, k=1, m=1, dx=5e-2, dt=0.001, dk=dk, tc=t_max/2., sigma=10, t_max=t_max, plot=True)
+steps = len(energy_error) - 1
+fig, axs = plt.subplots(2)
+axs[0].plot(np.arange(steps + 1), energy_error, label='With respect to the exact value')
+axs[0].set_ylabel("Energy")
 
-    axs[1].semilogy(np.arange(steps + 1), normalization_error, label='Periodic boundary, p=0')
-    axs[1].set_ylabel("Normalization Error [%]")
+axs[1].semilogy(np.arange(steps + 1), normalization_error, label='Periodic boundary, p=0')
+axs[1].set_ylabel("Normalization Error [%]")
+energy_added = 100*(energy_error[-1]-energy_error[0]) / (dk**0.5 / 2.)
+print(energy_added)
+fig.suptitle("Energy and relative error of the normalization, dt=0.001")
+plt.xlabel("Time steps [dt]")
+plt.savefig(str(dk)+"part2errors.svg")
+plt.clf()
+for ci in range(len(cs_lists)):
+    plt.semilogy(np.arange(steps + 1), cs_lists[ci], label='|C'+str(ci)+ '|^2')
+plt.xlabel("Time steps [dt]")
+plt.ylabel("Population")
+plt.axhline(y=prob(dk, 1., 1., 10), color='k', alpha=0.75, label="First order C2", ls='--')
+plt.legend()
+plt.savefig(str(dk)+"population.svg")
 
-    fig.suptitle("Energy and relative error of the normalization], dt=0.001")
-    plt.xlabel("Time steps [dt]")
-    plt.savefig(str(i)+"part2errors.svg")
-    plt.clf()
-    for ci in range(len(cs_lists)):
-        plt.semilogy(np.arange(steps + 1), cs_lists[ci], label='|C'+str(ci)+ '|^2')
-    plt.legend()
-    plt.xlabel("Time steps [dt]")
-    plt.savefig(str(i) + "population.svg")
+# #adiabatic
+# t_max = 5
+# dk = 0.1
+# energy_error, normalization_error, mean_x, mean_p, cs_lists = run(-5, 5, 1., 0., periodic=False, k=1, m=1, dx=5e-2, dt=0.001, dk=dk, tc=t_max/2., sigma=0.1, t_max=t_max, plot=False)
+# steps = len(energy_error) - 1
+# fig, axs = plt.subplots(2)
+# axs[0].plot(np.arange(steps + 1), energy_error, label='With respect to the exact value')
+# axs[0].set_ylabel("Energy")
+#
+# axs[1].semilogy(np.arange(steps + 1), normalization_error, label='Periodic boundary, p=0')
+# axs[1].set_ylabel("Normalization Error [%]")
+# print(energy_error[-1]-energy_error[0])
+# fig.suptitle("Energy and relative error of the normalization], dt=0.001")
+# plt.xlabel("Time steps [dt]")
+# plt.savefig(str(dk)+"part2errors.svg")
+# plt.clf()
+# for ci in range(len(cs_lists)):
+#     plt.semilogy(np.arange(steps + 1), cs_lists[ci], label='|C'+str(ci)+ '|^2')
+# plt.xlabel("Time steps [dt]")
+# plt.ylabel("Population")
+# plt.axhline(y=prob(0.1, 1., 1., 0.1), color='k', alpha=0.75, label="First order C2", ls='--')
+# plt.legend()
+# plt.savefig(str(dk)+"population.svg")
+#thats it
