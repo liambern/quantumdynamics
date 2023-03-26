@@ -1,27 +1,31 @@
 import numpy as np
 import scipy as sp
 from scipy.constants import Boltzmann
+import matplotlib.pyplot as plt
 
-kB = 8.617333e-5  # eV*K-1
-V = 0.3  # [V]
-T = 0.
+kB = 3.167e-6#8.617333e-5  # eV*K-1
+hbar = 1.#6.582119e-16  # eV*s
+e = 1.#1.60217663e-19  # c
+ev = 0.0367493
+V = 0.3 * ev # [V]
+T = 0.0
 
-N_L = 300
-N_R = 300
-N_ML = 50
-N_MR = 50
+N_L = 30
+N_R = 30
+N_ML = 5
+N_MR = 5
 N_M = 6
 N_EM = N_ML + N_MR + N_M
 
-a_L = 0.
-a_M = 0.
-a_R = 0.
+a_L = 0. * ev
+a_M = 0. * ev
+a_R = 0. * ev
 
-b_L = -0.2
-b_M = -0.2
-b_R = -0.2
-b_LM = -0.2
-b_RM = -0.2
+b_L = -0.2 * ev
+b_M = -0.2 * ev
+b_R = -0.2 * ev
+b_LM = -0.2 * ev
+b_RM = -0.2 * ev
 
 
 def matrix_format(a, b, N):
@@ -52,8 +56,8 @@ def f_dde(rho, t, h, rho_0_L, rho_0_R, gamma):
     emem = np.zeros([N_EM, N_EM])
     return -1.j * (h @ rho - rho @ h) - gamma * np.concatenate([np.concatenate([ll-rho_0_L, 0.5*eml, rl], axis=0),
                                                                 np.concatenate([0.5*lem, emem, 0.5*rem], axis=0),
-                                                                np.concatenate([lr, 0.5*emr, rr-rho_0_R], axis=0)]
-                                                               , axis=1)
+                                                                np.concatenate([lr, 0.5*emr, rr-rho_0_R], axis=0)],
+                                                               axis=1)
 
 
 def runge_kutta(rho, dt, h, rho_0_L, rho_0_R, gamma):
@@ -73,13 +77,18 @@ R = matrix_format(a_R, b_R, N_R)
 EM = construct_transfer(construct_transfer(ML, M, b_LM), MR, b_RM)
 h = construct_transfer(construct_transfer(L, EM, b_L), R, b_R)
 
-eigen_energies, U = sp.linalg.eigh(h)
+eigen_energies, _ = sp.linalg.eigh(h)
 fermi = (eigen_energies[eigen_energies.shape[0] // 2] + eigen_energies[eigen_energies.shape[0] // 2 - 1]) / 2
 h_diag = np.diag(eigen_energies)
 
-L_diag = np.diag(sp.linalg.eigh(L, eigvals_only=True))
-EM_diag = np.diag(sp.linalg.eigh(EM, eigvals_only=True))
-R_diag = np.diag(sp.linalg.eigh(R, eigvals_only=True))
+L_diag, U_L = sp.linalg.eigh(L)
+EM_diag, U_EM = sp.linalg.eigh(EM)
+R_diag, U_R = sp.linalg.eigh(R)
+U = sp.linalg.block_diag(U_L, U_EM, U_R)
+
+L_diag = np.diag(L_diag)
+EM_diag = np.diag(EM_diag)
+R_diag = np.diag(R_diag)
 
 E_F_L = (np.diag(L_diag)[np.diag(L_diag).shape[0] // 2] + np.diag(L_diag)[np.diag(L_diag).shape[0] // 2 - 1]) / 2
 E_F_R = (np.diag(R_diag)[np.diag(R_diag).shape[0] // 2] + np.diag(R_diag)[np.diag(R_diag).shape[0] // 2 - 1]) / 2
@@ -90,9 +99,16 @@ rho_0_L = np.diag(fermi_dirac(np.diag(L_diag), T, mu_L))
 rho_0_R = np.diag(fermi_dirac(np.diag(R_diag), T, mu_R))
 rho = np.diag(fermi_dirac(np.diag(h_diag), T, fermi))
 
-rho_0_L_wave = np.conjugate((U[:N_L, :N_L])).T @ rho_0_L @ U[:N_L, :N_L]
-rho_0_R_wave =np.conjugate((U[-N_R:, -N_R:])).T @ rho_0_R @ U[-N_R:, -N_R:]
+rho_0_L_wave = np.conjugate(U_L).T @ rho_0_L @ U_L
+rho_0_R_wave = np.conjugate(U_R).T @ rho_0_R @ U_R
 rho_wave = np.conjugate(U).T @ rho @ U
 h_wave = np.conjugate(U).T @ h @ U
-
-rho_wave = runge_kutta(rho_wave, 1.e-3, h_wave, rho_0_L_wave, rho_0_R_wave, 0.1)
+print(h_wave)
+current = []
+print(rho_wave)
+for i in range(10000):
+    rho_wave = runge_kutta(rho_wave, 1.e-15, h_wave, rho_0_L_wave, rho_0_L_wave, 1e-15)
+    # current.append((2*b_L*e/hbar)*np.trace(np.imag(U @ rho_wave @ np.conjugate(U).T)))
+    current.append(np.trace(f_dde(rho_wave, 0, h_wave, rho_0_L_wave, rho_0_L_wave, 1e-15)))
+plt.plot(range(10000), current)
+plt.show()
