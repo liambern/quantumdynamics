@@ -3,17 +3,21 @@ import scipy as sp
 from scipy.constants import Boltzmann
 import matplotlib.pyplot as plt
 
-kB = 3.167e-6#8.617333e-5  # eV*K-1
-hbar = 1.#6.582119e-16  # eV*s
-e = 1.#1.60217663e-19  # c
-ev = 0.0367493
-V = 0.3 * ev # [V]
-T = 0.0
+# kB = 8.617333e-5  # eV*K-1
+# hbar = 6.582119e-16  # eV*s
+e = 1.60217663e-19  # c
+# ev = 1.#0.0367493
+# V = 0.3 * ev # [V]
+T = 1
+kB = 1.380649e-23
+hbar = 1.05457182e-34
+ev = 1.602188e-19
+V = 0.3
 
-N_L = 30
-N_R = 30
-N_ML = 5
-N_MR = 5
+N_L = 300
+N_R = 300
+N_ML = 50
+N_MR = 50
 N_M = 6
 N_EM = N_ML + N_MR + N_M
 
@@ -69,6 +73,22 @@ def runge_kutta(rho, dt, h, rho_0_L, rho_0_R, gamma):
     return rho + (k1 + 2. * k2 + 2. * k3 + k4) / 6
 
 
+def I(rho, h):
+    h_eml = h[N_L:N_L + N_EM, :N_L]
+    h_rem = h[-N_R:, N_L:N_L + N_EM]
+    h_lem = h[:N_L, N_L:N_L + N_EM]
+    h_emr = h[N_L:N_L + N_EM, -N_R:]
+
+    rho_eml = rho[N_L:N_L + N_EM, :N_L]
+    rho_rem = rho[-N_R:, N_L:N_L + N_EM]
+    rho_lem = rho[:N_L, N_L:N_L + N_EM]
+    rho_emr = rho[N_L:N_L + N_EM, -N_R:]
+
+    I_L = -(2.j/hbar) * np.trace(h_eml @ rho_lem - rho_eml @ h_lem)
+    I_R = -(2.j/hbar) * np.trace(h_emr @ rho_rem - rho_emr @ h_rem)
+    return -(e/2.)*(I_L + I_R)
+
+
 L = matrix_format(a_L, b_L, N_L)
 ML = matrix_format(a_L, b_L, N_ML)
 M = matrix_format(a_M, b_M, N_M)
@@ -94,7 +114,6 @@ E_F_L = (np.diag(L_diag)[np.diag(L_diag).shape[0] // 2] + np.diag(L_diag)[np.dia
 E_F_R = (np.diag(R_diag)[np.diag(R_diag).shape[0] // 2] + np.diag(R_diag)[np.diag(R_diag).shape[0] // 2 - 1]) / 2
 mu_L = E_F_L + 0.5 * V
 mu_R = E_F_R - 0.5 * V
-
 rho_0_L = np.diag(fermi_dirac(np.diag(L_diag), T, mu_L))
 rho_0_R = np.diag(fermi_dirac(np.diag(R_diag), T, mu_R))
 rho = np.diag(fermi_dirac(np.diag(h_diag), T, fermi))
@@ -103,12 +122,13 @@ rho_0_L_wave = np.conjugate(U_L).T @ rho_0_L @ U_L
 rho_0_R_wave = np.conjugate(U_R).T @ rho_0_R @ U_R
 rho_wave = np.conjugate(U).T @ rho @ U
 h_wave = np.conjugate(U).T @ h @ U
-print(h_wave)
 current = []
-print(rho_wave)
-for i in range(10000):
-    rho_wave = runge_kutta(rho_wave, 1.e-15, h_wave, rho_0_L_wave, rho_0_L_wave, 1e-15)
-    # current.append((2*b_L*e/hbar)*np.trace(np.imag(U @ rho_wave @ np.conjugate(U).T)))
-    current.append(np.trace(f_dde(rho_wave, 0, h_wave, rho_0_L_wave, rho_0_L_wave, 1e-15)))
-plt.plot(range(10000), current)
+
+for i in range(1000):
+    # print(i)
+    rho_wave = runge_kutta(rho_wave, 1e-15, h_wave, rho_0_L_wave, rho_0_L_wave, 1e-15)
+    # current.append((2*b_L*e/hbar)*np.trace(np.imag(U @ rho_wave @ np.conjugate(U).T))) I(rho, h)
+    current.append(I(rho_wave, h_wave))
+    print(current[-1])
+plt.plot(range(1000), current)
 plt.show()
