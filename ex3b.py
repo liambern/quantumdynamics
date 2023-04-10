@@ -1,5 +1,6 @@
 import numpy as np
 import scipy as sp
+from scipy import linalg
 from scipy.constants import Boltzmann
 import matplotlib.pyplot as plt
 
@@ -11,12 +12,12 @@ import matplotlib.pyplot as plt
 # V = 0.3 * ev*e
 # amper = 6.623618e-3
 
-kB = 8.61733e-5  # eV*K-1
-hbar = 0.67
+kB = 3.167e-6  #
+hbar = 1
 e = 1
 T = 0
-ev = 1.
-V = 0.3 * ev
+ev = 0.0367493
+V = 0.3 / 27.211386
 
 N_L = 300
 N_R = 300
@@ -42,15 +43,15 @@ def matrix_format(a, b, N):
 
 def construct_transfer(A, B, a):
     N_A = A.shape[0]
-    AB = sp.linalg.block_diag(A, B)
+    AB = linalg.block_diag(A, B)
     AB[N_A, N_A - 1] = a
     AB[N_A - 1, N_A] = a
     return AB
 
 
 def fermi_dirac(E, T, mu):
-    # return 1. / (np.exp((E - mu) / (kB * T)) + 1)
-    return np.heaviside(E-mu, E-mu)
+    return 1. / (np.exp((E - mu) / (kB * T)) + 1)
+    #return np.heaviside(E-mu, E-mu)
 
 def f_dde(rho, t, h, rho_0_L, rho_0_R, gamma):
     ll = rho[:N_L, :N_L]
@@ -113,7 +114,7 @@ L_diag, U_L = sp.linalg.eigh(L)
 EM_diag, U_EM = sp.linalg.eigh(EM)
 R_diag, U_R = sp.linalg.eigh(R)
 U = sp.linalg.block_diag(U_L, U_EM, U_R)
-print(eigen_energies)
+# print(eigen_energies)
 L_diag = np.diag(L_diag)
 EM_diag = np.diag(EM_diag)
 R_diag = np.diag(R_diag)
@@ -132,7 +133,6 @@ rho_0_L_wave = np.conjugate(U_L).T @ rho_0_L @ U_L
 rho_0_R_wave = np.conjugate(U_R).T @ rho_0_R @ U_R
 rho_wave = np.conjugate(U).T @ rho @ U
 h_wave = np.conjugate(U).T @ h @ U
-
 # ll = np.conjugate(U_L).T @ h[:N_L, :N_L] @ U_L
 # eml = np.conjugate(U_EM).T @ h[N_L:-N_R, :N_L] @ U_L
 # rl = np.conjugate(U_R).T @ h[:N_L, -N_R:] @ U_L
@@ -161,16 +161,19 @@ h_wave = np.conjugate(U).T @ h @ U
 #                            np.concatenate([lem, emem, rem], axis=0),
 #                            np.concatenate([lr, emr, rr], axis=0)],
 #                            axis=1)
-
+# print(np.diag(rho))
+# plt.plot(np.diag(rho))
+# plt.show()
 current = []
 # h_wave = np.conjugate(U).T @ h @ U
+timeunit = 41.35649
 try:
-    for i in range(25):
+    for i in range(1500):
         # print(np.trace(rho_wave))
-        rho_wave = runge_kutta(rho_wave, 1., h_wave, rho_0_L_wave, rho_0_L_wave, 0)
+        rho_wave = runge_kutta(rho_wave, timeunit * 1., h_wave, rho_0_L_wave, rho_0_L_wave, timeunit*0)
         # rho = runge_kutta(rho, 1., h, rho_0_L, rho_0_L, 0)
         # rho_wave = np.conjugate(U).T @ rho @ U
-        current.append(I(rho_wave, h_wave)*1.e15)
+        current.append(I(rho_wave, h_wave)*6.623617e-3)
         print(np.trace(rho_wave))
         # current.append(I(rho_wave, h_wave)*1.e15)
         print(current[-1])
