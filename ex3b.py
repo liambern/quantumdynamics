@@ -229,14 +229,14 @@ for j in [0., 0.001, 0.01, 0.1, 1.]:
         pass
 
     final_rho = np.diag(U @ rho_wave @ U.H)
-    plt.plot(EM_diag, final_rho[N_L:-N_R], label="EM")
-    plt.plot(L_diag, final_rho[:N_L], label="L")
-    plt.plot(R_diag, final_rho[-N_R:], label="R")
-    plt.scatter(M_diag, final_rho[N_L+N_ML:N_L+N_ML+N_M], label="M")
-    plt.legend()
-    plt.show()
+    # plt.plot(EM_diag, final_rho[N_L:-N_R], label="EM")
+    # plt.plot(L_diag, final_rho[:N_L], label="L")
+    # plt.plot(R_diag, final_rho[-N_R:], label="R")
+    # plt.scatter(M_diag, final_rho[N_L+N_ML:N_L+N_ML+N_M], label="M")
+    # plt.legend()
+    # plt.show()
     f = open(str(j) + ".pkl", "wb")
-    pkl.dump(current, f)
+    pkl.dump([current, final_rho], f)
     f.close()
 
 
