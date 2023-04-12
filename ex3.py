@@ -78,7 +78,7 @@ def der(f, h, stencils, periodic=False, order=1):
 # 2.
 
 def psi(x, p, x0):
-    sigma0 = 0.5
+    sigma0 = 1.
     return (sigma0 * (2. * np.pi) ** 0.5) ** (-0.5) * np.exp(-((x - x0) ** 2. / (4. * sigma0 ** 2.)) + 1.j * p * x)
 
 
@@ -127,7 +127,7 @@ def test(ff, dd1, dd2, h_list, s):
 # plt.savefig("img.pdf")
 
 
-def run(x_min, x_max, periodic=False, p=0, mu=0, x_0=2., A=1., B=1., dx=5e-2, dt=0.001, t_max=10, plot=False):
+def run(x_min, x_max, periodic=False, p=0, mu=0, x_0=25., A=1., B=1., dx=5e-2, dt=0.001, t_max=10, plot=False):
     if not periodic:
         x, h = grid(x_min - 1, x_max + 1, dx)
     else:
@@ -159,7 +159,9 @@ def run(x_min, x_max, periodic=False, p=0, mu=0, x_0=2., A=1., B=1., dx=5e-2, dt
 
     if plot:
         fig = plt.figure()
+        fig.set_tight_layout(True)
         ax = fig.add_subplot(111)
+        ax2 = ax.twinx()
         title = ''
         if periodic:
             title += 'Periodic boundary, '
@@ -167,20 +169,23 @@ def run(x_min, x_max, periodic=False, p=0, mu=0, x_0=2., A=1., B=1., dx=5e-2, dt
             ax.axvline(x_min, c='r', ls='--')
             ax.axvline(x_max, c='r', ls='--')
             title += 'Rigid boundary, '
-        title += 'p={p}, duration={t_run} (all variables in atomic units)'.format(p=str(p)[:5], t_run=str(t_max))
+        title = "p={p}, A={a}, B={b}".format(a=str(A)[:5], b=str(B)[:5], p=str(p)[:5])
         fig.suptitle(title)
         ax.set_ylim([-1, 1])
         ax.set_xlim([x[0], x[-1]])
+        ax2.set_ylim([-1.25*10*0.5*p**2., 1.25*10*0.5*p**2.])
+        ax2.set_ylabel("Im(V)")
         ax.grid(True, which='both', ls='--')
         ax.axhline(y=0, color='k', alpha=0.75)
         ax.set_axisbelow(True)
-        ax.plot(x, A * (sp.erf(B * (x - x_0)) + 1.) / 2., ls='dashed', color='m')
+        ax2.plot(x, A * (sp.erf(B * (x - x_0)) + 1.) / 2., ls='dashed', color='m')
         ax.set_xlabel("X")
         line1, = ax.plot(x, np.abs(y), label='|Ψ(x)|')
         line2, = ax.plot(x, np.real(y), label='Re(Ψ(x))')
         line3, = ax.plot(x, np.imag(y), label='Imag(Ψ(x))')
-        ax.legend()
-
+        leg = ax.legend()
+        leg.remove()
+        ax2.add_artist(leg)
         frame_skip = 4  # frame spacings to not plot, for memory reasons
 
         def animate(i):
@@ -194,8 +199,7 @@ def run(x_min, x_max, periodic=False, p=0, mu=0, x_0=2., A=1., B=1., dx=5e-2, dt
             line3.set_ydata(np.imag(y))
             return line1, line2, line3
         ani = FuncAnimation(fig, animate, frames=int((t_max / dt) / frame_skip), blit=True)
-        ani.save("max={max},min={min},p={p},periodic={periodic}.gif".format(max=str(x_max), min=str(x_min), p=str(p)[:5],
-                periodic=str(periodic)), dpi=250, writer=PillowWriter(fps=50))
+        ani.save("p={p}, A={a}, B={b}.gif".format(a=str(A)[:5], b=str(B)[:5], p=str(p)[:5]), dpi=250, writer=PillowWriter(fps=50))
     else:
         for k in range(int(t_max / dt)):
             y = runge_kutta(y_list[0], x, h, dt=dt)
@@ -223,17 +227,55 @@ def plot_dens(l, m, r, name, steps):
     plt.xlabel("Time steps [dt]")
     plt.savefig(name+".svg")
 
+p = 5.
+# t_max = 5.
 
-energy_error_1, normalization_error_1 = run(-5, 100, periodic=False, p=5, x_0=5, A=0.5*5**2., B=1, dx=5e-2, dt=0.001, t_max=5, plot=True)
+# for b in [0.2, 1., 5.]:
+#     t_max = 5.
+#     if b == 0.2:
+#         t_max = 10.
+#     energy_error_1, normalization_error_1 = run(-20, 100, periodic=False, p=p, x_0=10, A=0.5 * p ** 2., B=b, dx=5e-2,
+#                                                 dt=0.001, t_max=t_max, plot=True)
+#
+#     steps = len(energy_error_1) - 1
+#     fig, axs = plt.subplots(2)
+#     axs[0].semilogy(np.arange(steps + 1), energy_error_1, label='Periodic boundary, p=0')
+#     axs[0].set_ylabel("Energy")
+#     axs[1].semilogy(np.arange(steps + 1), normalization_error_1, label='Periodic boundary, p=0')
+#     axs[1].set_ylabel("Normalization")
+#
+#     # fig.suptitle("Relative errors [%], dt=0.001")
+#     plt.xlabel("Time steps [dt]")
+#     plt.savefig("a="+str(1)+",b="+str(b)+".svg", bbox_inches='tight')
+#
+# for a in [0.2, 1., 5.]:
+#     t_max = 5.
+#     if a == 0.2:
+#         t_max = 10.
+#     energy_error_1, normalization_error_1 = run(-20, 100, periodic=False, p=p, x_0=10, A=a*0.5*p**2., B=1, dx=5e-2, dt=0.001, t_max=t_max, plot=True)
+#
+#     steps = len(energy_error_1)-1
+#     fig, axs = plt.subplots(2)
+#     axs[0].semilogy(np.arange(steps+1), energy_error_1, label='Periodic boundary, p=0')
+#     axs[0].set_ylabel("Energy")
+#     axs[1].semilogy(np.arange(steps+1), normalization_error_1, label='Periodic boundary, p=0')
+#     axs[1].set_ylabel("Normalization")
+#
+#     # axs[1].legend()
+#     # fig.suptitle("Relative errors [%], dt=0.001")
+#     plt.xlabel("Time steps [dt]")
+#     plt.savefig("a="+str(a)+",b="+str(1.)+".svg", bbox_inches='tight')
 
-steps = len(energy_error_1)-1
+energy_error_1, normalization_error_1 = run(-20, 100, periodic=False, p=p, x_0=10, A=0. * p ** 2., B=1, dx=5e-2,
+                                            dt=0.001, t_max=5., plot=True)
+
+steps = len(energy_error_1) - 1
 fig, axs = plt.subplots(2)
-axs[0].plot(np.arange(steps+1), energy_error_1, label='Periodic boundary, p=0')
+axs[0].plot(np.arange(steps + 1), energy_error_1, label='Periodic boundary, p=0')
 axs[0].set_ylabel("Energy")
-axs[1].plot(np.arange(steps+1), normalization_error_1, label='Periodic boundary, p=0')
+axs[1].plot(np.arange(steps + 1), normalization_error_1, label='Periodic boundary, p=0')
 axs[1].set_ylabel("Normalization")
 
-axs[1].legend()
 # fig.suptitle("Relative errors [%], dt=0.001")
 plt.xlabel("Time steps [dt]")
-plt.savefig("1_dt=0.001.svg", bbox_inches='tight')
+plt.savefig("a="+str(0)+".svg", bbox_inches='tight')
