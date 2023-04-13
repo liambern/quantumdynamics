@@ -97,10 +97,12 @@ def f_dde(rho_wave, t):
     # np.fill_diagonal(rho_0_L_edited, np.diagonal(rho_0_L))
     # rho_0_R_edited = np.copy(rr)
     # np.fill_diagonal(rho_0_R_edited, np.diagonal(rho_0_R))
-    return -1.j * (np.matmul(h_wave, rho_wave) - np.matmul(rho_wave, h_wave)) / hbar - gamma * np.concatenate([np.concatenate([ll - rho_0_L_wave, 0.5 * eml, rl], axis=0),
-                                                                                         np.concatenate([0.5*lem, emem, 0.5*rem], axis=0),
-                                                                                          np.concatenate([lr, 0.5*emr, rr-rho_0_R_wave], axis=0)],
-                                                                                         axis=1)
+    return -1.j * (np.matmul(h_wave, rho_wave) - np.matmul(rho_wave, h_wave)) / hbar - gamma * np.block([
+                                                                                    [ll - rho_0_L, 0.5 * lem, lr],
+                                                                                    [0.5*eml, emem, 0.5*emr],
+                                                                                    [rl, 0.5*rem, rr-rho_0_R]])
+
+
 @jit
 def runge_kutta(rho, dt):
     t0 = 0.
@@ -182,7 +184,7 @@ rho_0_ML = np.diag(fermi_dirac(ML_diag, T, mu_L))
 rho_0_MR = np.diag(fermi_dirac(MR_diag, T, mu_R))
 rho_0_L = np.diag(fermi_dirac(L_diag, T, mu_L))
 rho_0_R = np.diag(fermi_dirac(R_diag, T, mu_R))
-rho = linalg.block_diag(rho_0_L, rho_0_ML, rho_0_M, rho_0_MR, rho_0_R)
+rho = linalg.block_diag(rho_0_L, rho_0_EM, rho_0_R)
 rho_0_L_wave = U_L.H @ rho_0_L @ U_L
 rho_0_L_wave_x = create_rectangular_block_matrix(shape_N, (0, 0), (N_L, N_L), rho_0_L_wave)
 rho_0_R_wave = U_R.H @ rho_0_R @ U_R
@@ -206,6 +208,7 @@ def I(rho):
     I_R = -(2.j/hbar) * np.trace(h_MR @ rho_RM - rho_MR @ h_RM)
     return (e/2.)*(I_L - I_R)*6.623617e-3*1000
 
+
 def I_syl():
     A = -1.j*h_wave/hbar-gamma*(tl+br)/2.
     B = 1.j*h_wave/hbar-gamma*(tl+br)/2.
@@ -215,20 +218,20 @@ def I_syl():
 
 for j in [0., 0.001, 0.01, 0.1, 1.]:
     rho = linalg.block_diag(rho_0_L, rho_0_EM, rho_0_R)
-    rho_wave = U.H @ rho @ U
+    # rho_wave = U.H @ rho @ U
     gamma= j/seconds
     current = []
     try:
         for i in range(3000):
-            rho_wave = runge_kutta(rho_wave, seconds)
-            current.append(I(rho_wave))
+            rho = runge_kutta(rho, seconds)
+            current.append(I(rho))
             print(i)
-            print(np.trace(rho_wave))
+            print(np.trace(rho))
             print(current[-1])
     except KeyboardInterrupt:
         pass
 
-    final_rho = np.diag(U @ rho_wave @ U.H)
+    # final_rho = np.diag(U @ rho_wave @ U.H)
     # plt.plot(EM_diag, final_rho[N_L:-N_R], label="EM")
     # plt.plot(L_diag, final_rho[:N_L], label="L")
     # plt.plot(R_diag, final_rho[-N_R:], label="R")
@@ -236,14 +239,14 @@ for j in [0., 0.001, 0.01, 0.1, 1.]:
     # plt.legend()
     # plt.show()
     f = open(str(j) + ".pkl", "wb")
-    pkl.dump([current, final_rho], f)
+    pkl.dump([current, rho], f)
     f.close()
 
 
 # def load(name):
 #     file = open(str(name) + ".pkl", 'rb')
 #     object_file = pickle.load(file)
-#     plt.plot(object_file)
+#     plt.plot(object_file[0])
 #     plt.show()
 #     plt.clf()
 #     file.close()
