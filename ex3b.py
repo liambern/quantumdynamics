@@ -48,7 +48,7 @@ def extract(matrix, block_position, block_shape):
     return matrix[row_start:row_end, col_start:col_end]
 
 
-def run(V, gamma, N=np.array([300, 50, 6, 50, 300]), beta=np.array([-0.2, -0.2, -0.2, -0.2, -0.2]), alpha=np.array([0.0, 0.0, 0.0])):
+def run(V, gamma, N=np.array([300, 50, 6, 50, 300]), beta=np.array([-0.2, -0.2, -0.2, -0.2, -0.2]), alpha=np.array([0.0, 0.0, 0.0]), mode='normal'):
     N_L, N_ML, N_M, N_MR, N_R = N
     b_L, b_LM, b_M, b_RM, b_R = beta * ev
     a_L, a_M, a_R = alpha * ev
@@ -84,7 +84,7 @@ def run(V, gamma, N=np.array([300, 50, 6, 50, 300]), beta=np.array([-0.2, -0.2, 
         return rho + (k1 + 2. * k2 + 2. * k3 + k4) / 6
 
     shape_N = (N_tot, N_tot)
-    # tl = create_rectangular_block_matrix(shape_N, (0, 0), (N_L, N_L))
+    tl = create_rectangular_block_matrix(shape_N, (0, 0), (N_L, N_L), np.eye(N_L))
     # tm = create_rectangular_block_matrix(shape_N, (0, N_L), (N_L, N_EM))
     # tr = create_rectangular_block_matrix(shape_N, (0, N_L+N_EM), (N_L, N_R))
     # ml = create_rectangular_block_matrix(shape_N, (N_L, 0), (N_EM,N_L))
@@ -92,8 +92,7 @@ def run(V, gamma, N=np.array([300, 50, 6, 50, 300]), beta=np.array([-0.2, -0.2, 
     # mr = create_rectangular_block_matrix(shape_N, (N_L, N_L+N_EM), (N_EM,N_R))
     # bl = create_rectangular_block_matrix(shape_N, (N_L+N_EM, 0), (N_R,N_L))
     # bm = create_rectangular_block_matrix(shape_N, (N_L+N_EM, N_L), (N_R,N_EM))
-    # br = create_rectangular_block_matrix(shape_N, (N_L+N_EM,  N_L+N_EM), (N_R,N_R))
-
+    br = create_rectangular_block_matrix(shape_N, (N_L+N_EM,  N_L+N_EM), (N_R,N_R), np.eye(N_R))
 
     L = matrix_format(a_L, b_L, N_L)
     ML = matrix_format(a_L, b_L, N_ML)
@@ -118,7 +117,7 @@ def run(V, gamma, N=np.array([300, 50, 6, 50, 300]), beta=np.array([-0.2, -0.2, 
 
     U = np.asmatrix(sp.linalg.block_diag(U_L, U_EM, U_R))
 
-    E_F_R = np.median(L_diag)
+    E_F_R = np.median(R_diag)
     E_F_L = np.median(L_diag)
     rho_0_EM = np.diag(fermi_dirac(EM_diag, T, fermi))
     rho_0_M = np.diag(fermi_dirac(M_diag, T, fermi))
@@ -145,32 +144,46 @@ def run(V, gamma, N=np.array([300, 50, 6, 50, 300]), beta=np.array([-0.2, -0.2, 
     rho_0_R = np.diag(fermi_dirac(R_diag, T, mu_R))
     rho = linalg.block_diag(rho_0_L, rho_0_EM, rho_0_R)
     current = []
-    try:
-        for i in range(3000):
-            rho = runge_kutta(rho, seconds)
-            current.append(I(rho))
-            print(i)
-            print(np.trace(rho))
-            print(current[-1])
-    except KeyboardInterrupt:
-        pass
 
-    f = open(str(V/volt) + ',' + str(gamma*seconds) + str(alpha)+ str(beta)+".pkl", "wb")
-    pkl.dump([current, rho], f)
-    f.close()
+    if mode == "normal":
+        try:
+            for i in range(3000):
+                rho = runge_kutta(rho, seconds)
+                current.append(I(rho))
+                print(i)
+                print(np.trace(rho))
+                print(current[-1])
+        except KeyboardInterrupt:
+            pass
 
-for betas in [-0.2, -0.05]:
-    for v in [0.1, 0.2, 0.3, 0.4, 0.5]:
-        run(V=v, gamma=0.01, beta=np.array([-0.2, betas, -0.2, betas, -0.2]), alpha=np.array([0.0, 0.0, 0.0]))
+        f = open(str(V/volt) + ',' + str(gamma*seconds) + str(alpha)+ str(beta)+".pkl", "wb")
+        pkl.dump([current, rho], f)
+        f.close()
+    elif mode == "sylvester":
+        def I_syl():
+            A = -1.j * h_wave / hbar - gamma * (tl + br) / 2.
+            B = 1.j * h_wave / hbar - gamma * (tl + br) / 2.
+            C = -gamma * linalg.block_diag(rho_0_L, np.zeros([N_EM, N_EM]), rho_0_R)
+            # C = -gamma*create_rectangular_block_matrix(shape_N, (0, 0), (N_L, N_L), rho_0_L)-gamma*create_rectangular_block_matrix(shape_N, (N_L+N_EM,  N_L+N_EM), (N_R, N_R), rho_0_R)
+            rho = linalg.solve_sylvester(A, B, C)
+            return I(rho)
 
-for alphas in [-0.05, 0.0, 0.05]:
-    run(V=0.3, gamma=0.01, beta=np.array([-0.2, -0.05, -0.2, -0.05, -0.2]), alpha=np.array([0.0, alphas, 0.0]))
+        return I_syl(gamma)
 
-# def I_syl(gamma):
-#     A = -1.j*h_wave/hbar-gamma*(tl+br)/2.
-#     B = 1.j*h_wave/hbar-gamma*(tl+br)/2.
-#     C = -gamma*create_rectangular_block_matrix(shape_N, (0, 0), (N_L, N_L), rho_0_L_wave)-gamma*create_rectangular_block_matrix(shape_N, (N_L+N_EM,  N_L+N_EM), (N_R, N_R), rho_0_R_wave)
-#     return I(linalg.solve_sylvester(A, B, C))
+
+
+# for betas in [-0.2, -0.05]:
+#     relist = []
+#     for v in [0.1, 0.2, 0.3, 0.4, 0.5]:
+#         run(V=v, gamma=0.01, beta=np.array([-0.2, betas, -0.2, betas, -0.2]), alpha=np.array([0.0, 0.0, 0.0]))
+#         relist.append(np.real(run(V=v, gamma=0.01, beta=np.array([-0.2, betas, -0.2, betas, -0.2]), alpha=np.array([0.0, 0.0, 0.0])), mode="sylvester"))
+#     print(relist)
+#
+# relist = []
+# for alphas in [-0.05, 0.0, 0.05]:
+#     relist.append(run(V=0.3, gamma=0.01, beta=np.array([-0.2, -0.05, -0.2, -0.05, -0.2]), alpha=np.array([0.0, alphas, 0.0]), mode="sylvester"))
+# print(relist)
+#
 
 
 
